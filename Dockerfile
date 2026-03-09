@@ -29,18 +29,15 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
-# Copiamos la build standalone. 
+# Copiamos la build standalone.
 # El script build de tu package.json ya se encarga de meter 'public' y '.next/static' aquí.
 COPY --from=builder /app/.next/standalone ./
 
 # IMPORTANTE: Copiamos explicitamente Prisma engine porque el modo standalone a veces lo oculta.
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-
-# Copiamos la carpeta prisma por si en el futuro necesitas correr migraciones desde la DB
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 
 # Iniciamos utilizando bun apuntando al server originado en standalone
-CMD ["sh", "-c", "set -e; if [ -d prisma/migrations ] && [ \"$(ls -A prisma/migrations 2>/dev/null)\" ]; then echo 'Applying Prisma migrations...'; bunx prisma migrate deploy; else echo 'No migrations found, running prisma db push...'; bunx prisma db push --accept-data-loss; fi; echo 'Running seed...'; bun run seed; bun server.js"]
+CMD ["sh", "-c", "set -e; if [ -d prisma/migrations ] && [ \"$(ls -A prisma/migrations 2>/dev/null)\" ]; then echo 'Applying Prisma migrations...'; ./node_modules/.bin/prisma migrate deploy; else echo 'No migrations found, running prisma db push...'; ./node_modules/.bin/prisma db push --accept-data-loss; fi; echo 'Running seed...'; bun run seed; bun server.js"]
