@@ -609,11 +609,11 @@ export default async function HomePage() {
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
-                <Button 
-                  asChild 
-                  size="lg" 
-                  variant="outline" 
-                  className="border-white/30 text-white hover:bg-white/10 gap-2 px-6 sm:px-8 h-10 sm:h-12 text-sm sm:text-base"
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="border-white/30 text-white bg-transparent hover:bg-white/10 gap-2 px-6 sm:px-8 h-10 sm:h-12 text-sm sm:text-base"
                 >
                   <a href="tel:6063335206">
                     <Phone className="h-4 w-4" />
