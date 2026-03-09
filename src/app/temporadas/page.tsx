@@ -11,13 +11,19 @@ import { Calendar, Package } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function TemporadasPage() {
-  const seasons = await db.season.findMany({
-    where: { isActive: true },
-    include: {
-      _count: { select: { products: true } }
-    },
-    orderBy: { startDate: "asc" }
-  });
+  let seasons: Awaited<ReturnType<typeof db.season.findMany>> = [];
+
+  try {
+    seasons = await db.season.findMany({
+      where: { isActive: true },
+      include: {
+        _count: { select: { products: true } }
+      },
+      orderBy: { startDate: "asc" }
+    });
+  } catch (error) {
+    console.error("TemporadasPage query failed", error);
+  }
 
   const now = new Date();
 

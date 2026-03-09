@@ -40,96 +40,100 @@ interface PageProps {
 export default async function CatalogoPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const currentPage = parseInt(params.pagina || "1");
-  
-  // Fetch categories and brands for filters
-  const [categories, brands] = await Promise.all([
-    db.category.findMany({
-      where: { parentId: null, isActive: true },
-      include: {
-        children: { where: { isActive: true } },
-        _count: { select: { products: { where: { isActive: true } } } }
-      },
-      orderBy: { name: "asc" }
-    }),
-    db.brand.findMany({
-      where: { isActive: true },
-      include: {
-        _count: { select: { products: { where: { isActive: true } } } }
-      },
-      orderBy: { name: "asc" }
-    }),
-  ]);
+  let categories: Awaited<ReturnType<typeof db.category.findMany>> = [];
+  let brands: Awaited<ReturnType<typeof db.brand.findMany>> = [];
+  let products: Awaited<ReturnType<typeof db.product.findMany>> = [];
+  let totalProducts = 0;
 
-  // Build filter conditions
-  const where: Record<string, unknown> = { isActive: true };
-  
-  if (params.categoria) {
-    const category = await db.category.findFirst({
-      where: { slug: params.categoria }
-    });
-    if (category) {
-      const childCategories = await db.category.findMany({
-        where: { parentId: category.id },
-        select: { id: true }
+  try {
+    [categories, brands] = await Promise.all([
+      db.category.findMany({
+        where: { parentId: null, isActive: true },
+        include: {
+          children: { where: { isActive: true } },
+          _count: { select: { products: { where: { isActive: true } } } }
+        },
+        orderBy: { name: "asc" }
+      }),
+      db.brand.findMany({
+        where: { isActive: true },
+        include: {
+          _count: { select: { products: { where: { isActive: true } } } }
+        },
+        orderBy: { name: "asc" }
+      }),
+    ]);
+
+    const where: Record<string, unknown> = { isActive: true };
+
+    if (params.categoria) {
+      const category = await db.category.findFirst({
+        where: { slug: params.categoria }
       });
-      const categoryIds = [category.id, ...childCategories.map(c => c.id)];
-      where.categoryId = { in: categoryIds };
+      if (category) {
+        const childCategories = await db.category.findMany({
+          where: { parentId: category.id },
+          select: { id: true }
+        });
+        const categoryIds = [category.id, ...childCategories.map(c => c.id)];
+        where.categoryId = { in: categoryIds };
+      }
     }
-  }
-  
-  if (params.marca) {
-    const brand = await db.brand.findFirst({
-      where: { slug: params.marca }
-    });
-    if (brand) {
-      where.brandId = brand.id;
+
+    if (params.marca) {
+      const brand = await db.brand.findFirst({
+        where: { slug: params.marca }
+      });
+      if (brand) {
+        where.brandId = brand.id;
+      }
     }
-  }
-  
-  if (params.buscar) {
-    where.OR = [
-      { name: { contains: params.buscar } },
-      { sku: { contains: params.buscar } },
-      { description: { contains: params.buscar } }
-    ];
-  }
-  
-  if (params.destacados === "true") {
-    where.isFeatured = true;
-  }
-  
-  if (params.nuevo === "true") {
-    where.isNew = true;
-  }
 
-  // Determine sort order
-  let orderBy: Record<string, unknown>[] = [{ createdAt: "desc" }];
-  switch (params.ordenar) {
-    case "nombre-asc":
-      orderBy = [{ name: "asc" }];
-      break;
-    case "nombre-desc":
-      orderBy = [{ name: "desc" }];
-      break;
-    case "precio-asc":
-      orderBy = [{ wholesalePrice: "asc" }];
-      break;
-    case "precio-desc":
-      orderBy = [{ wholesalePrice: "desc" }];
-      break;
-  }
+    if (params.buscar) {
+      where.OR = [
+        { name: { contains: params.buscar } },
+        { sku: { contains: params.buscar } },
+        { description: { contains: params.buscar } }
+      ];
+    }
 
-  // Fetch products with pagination
-  const [products, totalProducts] = await Promise.all([
-    db.product.findMany({
-      where,
-      include: { brand: true, category: true },
-      orderBy,
-      skip: (currentPage - 1) * ITEMS_PER_PAGE,
-      take: ITEMS_PER_PAGE,
-    }),
-    db.product.count({ where }),
-  ]);
+    if (params.destacados === "true") {
+      where.isFeatured = true;
+    }
+
+    if (params.nuevo === "true") {
+      where.isNew = true;
+    }
+
+    let orderBy: Record<string, unknown>[] = [{ createdAt: "desc" }];
+    switch (params.ordenar) {
+      case "nombre-asc":
+        orderBy = [{ name: "asc" }];
+        break;
+      case "nombre-desc":
+        orderBy = [{ name: "desc" }];
+        break;
+      case "precio-asc":
+        orderBy = [{ wholesalePrice: "asc" }];
+        break;
+      case "precio-desc":
+        orderBy = [{ wholesalePrice: "desc" }];
+        break;
+    }
+
+    [products, totalProducts] = await Promise.all([
+      db.product.findMany({
+        where,
+        include: { brand: true, category: true },
+        orderBy,
+        skip: (currentPage - 1) * ITEMS_PER_PAGE,
+        take: ITEMS_PER_PAGE,
+      }),
+      db.product.count({ where }),
+    ]);
+  } catch (error) {
+    console.error("CatalogoPage query failed", error);
+  }
 
   const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
 

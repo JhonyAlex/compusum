@@ -68,6 +68,25 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Error during login:', error);
+
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+      if (
+        message.includes('database') ||
+        message.includes('prisma') ||
+        message.includes('relation') ||
+        message.includes('table')
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'La base de datos no está lista. Ejecuta migraciones y seed del admin.'
+          },
+          { status: 503 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { success: false, error: 'Error al iniciar sesión' },
       { status: 500 }

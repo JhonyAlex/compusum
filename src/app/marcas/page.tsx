@@ -9,13 +9,19 @@ import { ExternalLink } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function MarcasPage() {
-  const brands = await db.brand.findMany({
-    where: { isActive: true },
-    include: {
-      _count: { select: { products: { where: { isActive: true } } } }
-    },
-    orderBy: { name: "asc" }
-  });
+  let brands: Awaited<ReturnType<typeof db.brand.findMany>> = [];
+
+  try {
+    brands = await db.brand.findMany({
+      where: { isActive: true },
+      include: {
+        _count: { select: { products: { where: { isActive: true } } } }
+      },
+      orderBy: { name: "asc" }
+    });
+  } catch (error) {
+    console.error("MarcasPage query failed", error);
+  }
 
   const brandColors = [
     "bg-[#0D4DAA]",

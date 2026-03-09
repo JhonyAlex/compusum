@@ -40,10 +40,16 @@ function formatPrice(price: number | null | undefined): string {
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
-  const product = await db.product.findUnique({
-    where: { slug },
-    include: { brand: true, category: true }
-  });
+  let product: Awaited<ReturnType<typeof db.product.findUnique>> = null;
+
+  try {
+    product = await db.product.findUnique({
+      where: { slug },
+      include: { brand: true, category: true }
+    });
+  } catch (error) {
+    console.error("Product metadata query failed", error);
+  }
 
   if (!product) return { title: "Producto no encontrado" };
 
@@ -55,38 +61,54 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  
-  const product = await db.product.findUnique({
-    where: { slug },
-    include: {
-      brand: true,
-      category: {
-        include: { parent: true }
-      },
-      images: { orderBy: { sortOrder: "asc" } }
-    }
-  });
+
+  let product: Awaited<ReturnType<typeof db.product.findUnique>> = null;
+
+  try {
+    product = await db.product.findUnique({
+      where: { slug },
+      include: {
+        brand: true,
+        category: {
+          include: { parent: true }
+        },
+        images: { orderBy: { sortOrder: "asc" } }
+      }
+    });
+  } catch (error) {
+    console.error("Product detail query failed", error);
+  }
 
   if (!product || !product.isActive) {
     notFound();
   }
 
   // Get related products
-  const relatedProducts = await db.product.findMany({
-    where: {
-      categoryId: product.categoryId,
-      isActive: true,
-      id: { not: product.id }
-    },
-    include: { brand: true, category: true },
-    take: 4
-  });
+  let relatedProducts: Awaited<ReturnType<typeof db.product.findMany>> = [];
+
+  try {
+    relatedProducts = await db.product.findMany({
+      where: {
+        categoryId: product.categoryId,
+        isActive: true,
+        id: { not: product.id }
+      },
+      include: { brand: true, category: true },
+      take: 4
+    });
+  } catch (error) {
+    console.error("Related products query failed", error);
+  }
 
   // Increment view count
-  await db.product.update({
-    where: { id: product.id },
-    data: { viewsCount: { increment: 1 } }
-  });
+  try {
+    await db.product.update({
+      where: { id: product.id },
+      data: { viewsCount: { increment: 1 } }
+    });
+  } catch (error) {
+    console.error("Product view count update failed", error);
+  }
 
   const whatsappMessage = `Hola, quiero cotizar: ${product.name}${product.sku ? ` (Ref: ${product.sku})` : ""}`;
   const whatsappUrl = `https://wa.me/576063335206?text=${encodeURIComponent(whatsappMessage)}`;

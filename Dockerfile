@@ -43,4 +43,4 @@ COPY --from=builder /app/prisma ./prisma
 EXPOSE 3000
 
 # Iniciamos utilizando bun apuntando al server originado en standalone
-CMD ["bun", "server.js"]
+CMD ["sh", "-c", "set -e; if [ -d prisma/migrations ] && [ \"$(ls -A prisma/migrations 2>/dev/null)\" ]; then echo 'Applying Prisma migrations...'; bunx prisma migrate deploy; else echo 'No migrations found, running prisma db push...'; bunx prisma db push --skip-generate; fi; echo 'Running seed...'; bun run seed; bun server.js"]
