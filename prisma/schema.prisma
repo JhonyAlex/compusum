@@ -1,0 +1,193 @@
+// Compusum - Papelería Mayorista Colombiana
+// Prisma Schema para Next.js + SQLite
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// USUARIOS ADMIN
+// =====================
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String   // Hash bcrypt
+  role      String   @default("editor") // admin, editor
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// =====================
+// CATEGORÍAS
+// =====================
+model Category {
+  id             String      @id @default(cuid())
+  name           String
+  slug           String      @unique
+  description    String?
+  image          String?
+  icon           String?     // Emoji o clase CSS
+  parentId       String?
+  parent         Category?   @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children       Category[]  @relation("CategoryTree")
+  sortOrder      Int         @default(0)
+  isActive       Boolean     @default(true)
+  metaTitle      String?
+  metaDescription String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  products       Product[]
+}
+
+// =====================
+// MARCAS
+// =====================
+model Brand {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  logo        String?
+  website     String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+// =====================
+// TEMPORADAS
+// =====================
+model Season {
+  id          String          @id @default(cuid())
+  name        String
+  slug        String          @unique
+  description String?
+  image       String?
+  startDate   DateTime?
+  endDate     DateTime?
+  colorHex    String?         @default("#E89A00")
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  products    ProductSeason[]
+}
+
+// =====================
+// PRODUCTOS
+// =====================
+model Product {
+  id                String          @id @default(cuid())
+  name              String
+  slug              String          @unique
+  sku               String?         @unique
+  description       String?
+  shortDescription  String?
+  categoryId        String
+  category          Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  brandId           String?
+  brand             Brand?          @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  price             Float?
+  wholesalePrice    Float?
+  minWholesaleQty   Int             @default(1)
+  stockStatus       String          @default("disponible") // disponible, agotado, por_pedido
+  isFeatured        Boolean         @default(false)
+  isNew             Boolean         @default(false)
+  isActive          Boolean         @default(true)
+  tags              String?
+  sortOrder         Int             @default(0)
+  viewsCount        Int             @default(0)
+  metaTitle         String?
+  metaDescription   String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  images            ProductImage[]
+  seasons           ProductSeason[]
+}
+
+// =====================
+// IMÁGENES DE PRODUCTOS
+// =====================
+model ProductImage {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  imagePath     String
+  thumbnailPath String?
+  altText       String?
+  isPrimary     Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+}
+
+// =====================
+// TABLA PIVOTE PRODUCTO-TEMPORADA
+// =====================
+model ProductSeason {
+  productId String
+  seasonId  String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  season    Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@id([productId, seasonId])
+}
+
+// =====================
+// BANNERS
+// =====================
+model Banner {
+  id           String   @id @default(cuid())
+  title        String
+  subtitle     String?
+  imageDesktop String
+  imageMobile  String?
+  linkUrl      String?
+  linkText     String   @default("Ver más")
+  position     String   @default("hero") // hero, promo, category, brand
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// =====================
+// MENSAJES DE CONTACTO
+// =====================
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  city      String?
+  company   String?
+  message   String
+  type      String   @default("consulta") // consulta, cotizacion, queja, otro
+  isRead    Boolean  @default(false)
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+// =====================
+// CONFIGURACIONES DEL SITIO
+// =====================
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String?
+  type      String   @default("text") // text, number, boolean, json, image
+  group     String   @default("general") // general, contact, social, shipping, seo
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
