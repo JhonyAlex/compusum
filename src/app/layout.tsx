@@ -20,9 +20,6 @@ export const metadata: Metadata = {
   description: "Compusum - Papelería mayorista en Pereira, Colombia. Distribuidores de las mejores marcas de útiles escolares y de oficina. Envíos a todo el país.",
   keywords: ["papelería", "mayorista", "Pereira", "Colombia", "útiles escolares", "oficina", "Compusum"],
   authors: [{ name: "Compusum S.A.S." }],
-  icons: {
-    icon: "/favicon.ico",
-  },
   openGraph: {
     title: "Compusum | Tu Papelería al por Mayor",
     description: "Papelería mayorista en Pereira, Colombia. Distribuidores de las mejores marcas.",

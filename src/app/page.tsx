@@ -143,12 +143,17 @@ const trustIndicators = [
 ];
 
 export default async function HomePage() {
-  // Fetch brands for display
-  const brands = await db.brand.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-    take: 12,
-  });
+  let brands: Awaited<ReturnType<typeof db.brand.findMany>> = [];
+
+  try {
+    brands = await db.brand.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+      take: 12,
+    });
+  } catch (error) {
+    console.error("HomePage brands query failed", error);
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
