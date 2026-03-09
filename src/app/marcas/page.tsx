@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function MarcasPage() {
   const brands = await db.brand.findMany({
     where: { isActive: true },

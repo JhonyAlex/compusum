@@ -29,6 +29,8 @@ import {
   TrendingUp
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 // Product Lines Data
 const productLines = [
   {

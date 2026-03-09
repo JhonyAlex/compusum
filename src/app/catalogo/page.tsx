@@ -19,6 +19,8 @@ import {
   Package
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 const ITEMS_PER_PAGE = 12;
 
 interface SearchParams {
