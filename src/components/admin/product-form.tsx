@@ -7,7 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -89,7 +95,9 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
     isActive: product?.isActive ?? true,
     tags: product?.tags || "",
     sortOrder: product?.sortOrder || 0,
-    images: product?.images || [] as { id?: string; imagePath: string; isPrimary: boolean }[],
+    images:
+      product?.images ||
+      ([] as { id?: string; imagePath: string; isPrimary: boolean }[]),
   });
 
   const generateSlug = (name: string) => {
@@ -115,7 +123,10 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
         ...prev,
         images: [
           ...prev.images,
-          { imagePath: newImageUrl.trim(), isPrimary: prev.images.length === 0 },
+          {
+            imagePath: newImageUrl.trim(),
+            isPrimary: prev.images.length === 0,
+          },
         ],
       }));
       setNewImageUrl("");
@@ -178,8 +189,14 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
         return;
       }
 
-      router.push("/admin/productos");
       router.refresh();
+
+      if (product) {
+        // Return to the previous page (e.g., filtered list)
+        router.back();
+      } else {
+        router.push("/admin/productos");
+      }
     } catch (err) {
       setError("Error de conexión. Intenta de nuevo.");
     } finally {
@@ -196,7 +213,11 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
         </Alert>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="pricing">Precios</TabsTrigger>
@@ -208,10 +229,10 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
         <TabsContent value="general" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Información del producto</CardTitle>
-              <CardDescription>
-                Información básica del producto
-              </CardDescription>
+              <CardTitle className="text-lg">
+                Información del producto
+              </CardTitle>
+              <CardDescription>Información básica del producto</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
@@ -271,7 +292,10 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
                   id="description"
                   value={formData.description}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, description: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
                   }
                   placeholder="Descripción detallada del producto..."
                   rows={5}
@@ -369,7 +393,10 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
                       type="number"
                       value={formData.price}
                       onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, price: e.target.value }))
+                        setFormData((prev) => ({
+                          ...prev,
+                          price: e.target.value,
+                        }))
                       }
                       placeholder="5000"
                       className="pl-9"
@@ -398,7 +425,9 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="minWholesaleQty">Unidades mínimas mayorista</Label>
+                  <Label htmlFor="minWholesaleQty">
+                    Unidades mínimas mayorista
+                  </Label>
                   <Input
                     id="minWholesaleQty"
                     type="number"
@@ -411,9 +440,7 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
                     }
                     placeholder="12"
                   />
-                  <p className="text-xs text-slate-500">
-                    Ej: x12+ unidades
-                  </p>
+                  <p className="text-xs text-slate-500">Ej: x12+ unidades</p>
                 </div>
               </div>
 
@@ -458,7 +485,12 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
                     placeholder="https://ejemplo.com/imagen.jpg"
                   />
                 </div>
-                <Button type="button" onClick={addImage} variant="outline" className="shrink-0 mb-0.5">
+                <Button
+                  type="button"
+                  onClick={addImage}
+                  variant="outline"
+                  className="shrink-0 mb-0.5"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Agregar
                 </Button>
@@ -471,7 +503,9 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
                     <div key={index} className="relative group">
                       <div
                         className={`aspect-square rounded-lg overflow-hidden border-2 ${
-                          image.isPrimary ? "border-blue-500" : "border-slate-200"
+                          image.isPrimary
+                            ? "border-blue-500"
+                            : "border-slate-200"
                         }`}
                       >
                         <img
@@ -615,7 +649,11 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
         >
           Cancelar
         </Button>
-        <Button type="submit" className="flex-1 sm:flex-none" disabled={loading}>
+        <Button
+          type="submit"
+          className="flex-1 sm:flex-none"
+          disabled={loading}
+        >
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
           ) : (
