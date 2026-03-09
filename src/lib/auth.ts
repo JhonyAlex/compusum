@@ -6,9 +6,6 @@ const SALT_ROUNDS = 10;
 const SESSION_COOKIE_NAME = 'session_token';
 const SESSION_DURATION_HOURS = 24;
 
-// Simple in-memory session store (for production, use Redis or database)
-const sessions = new Map<string, { userId: string; expiresAt: Date }>();
-
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
@@ -26,27 +23,31 @@ export function generateToken(): string {
 export async function createSession(userId: string): Promise<string> {
   const token = generateToken();
   const expiresAt = new Date(Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000);
-  
-  sessions.set(token, { userId, expiresAt });
-  
+
+  await db.session.create({
+    data: { token, userId, expiresAt },
+  });
+
   return token;
 }
 
 export async function getSession(token: string): Promise<{ userId: string } | null> {
-  const session = sessions.get(token);
-  
+  const session = await db.session.findUnique({
+    where: { token },
+  });
+
   if (!session) return null;
-  
+
   if (session.expiresAt < new Date()) {
-    sessions.delete(token);
+    await db.session.delete({ where: { token } });
     return null;
   }
-  
+
   return { userId: session.userId };
 }
 
 export async function deleteSession(token: string): Promise<void> {
-  sessions.delete(token);
+  await db.session.deleteMany({ where: { token } });
 }
 
 export async function getCurrentUser(): Promise<{
