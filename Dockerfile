@@ -40,4 +40,4 @@ COPY --from=builder /app/prisma ./prisma
 EXPOSE 3000
 
 # Iniciamos utilizando bun apuntando al server originado en standalone
-CMD ["sh", "-c", "set -e; if [ -d prisma/migrations ] && [ \"$(ls -A prisma/migrations 2>/dev/null)\" ]; then echo 'Applying Prisma migrations...'; ./node_modules/.bin/prisma migrate deploy; else echo 'No migrations found, running prisma db push...'; ./node_modules/.bin/prisma db push --accept-data-loss; fi; echo 'Running seed...'; bun run seed; bun server.js"]
+CMD ["sh", "-c", "mkdir -p /app/public/uploads && set -e; if [ -d prisma/migrations ] && [ \"$(ls -A prisma/migrations 2>/dev/null)\" ]; then echo 'Applying Prisma migrations...'; ./node_modules/.bin/prisma migrate deploy; else echo 'No migrations found, running prisma db push...'; ./node_modules/.bin/prisma db push --accept-data-loss; fi; echo 'Running seed...'; bun run seed; bun server.js"]

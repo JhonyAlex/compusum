@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, Loader2, Save } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ImageUpload } from "@/components/admin/image-upload";
 
 interface Brand {
   id: string;
@@ -166,31 +167,12 @@ export function BrandForm({ brand }: BrandFormProps) {
             <CardHeader>
               <CardTitle className="text-lg">Logo</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="logo">URL del logo</Label>
-                <Input
-                  id="logo"
-                  value={formData.logo}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, logo: e.target.value }))
-                  }
-                  placeholder="https://..."
-                />
-              </div>
-
-              {formData.logo && (
-                <div className="w-32 h-32 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">
-                  <img
-                    src={formData.logo}
-                    alt="Preview"
-                    className="max-w-full max-h-full object-contain"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                </div>
-              )}
+            <CardContent>
+              <ImageUpload
+                label="URL o archivo"
+                value={formData.logo}
+                onChange={(url) => setFormData((prev) => ({ ...prev, logo: url }))}
+              />
             </CardContent>
           </Card>
         </div>

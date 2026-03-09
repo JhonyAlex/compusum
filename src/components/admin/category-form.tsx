@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { AlertCircle, Loader2, Save } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ImageUpload } from "@/components/admin/image-upload";
 
 interface Category {
   id: string;
@@ -172,31 +173,12 @@ export function CategoryForm({ category, categories }: CategoryFormProps) {
             <CardHeader>
               <CardTitle className="text-lg">Imagen</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="image">URL de imagen</Label>
-                <Input
-                  id="image"
-                  value={formData.image}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, image: e.target.value }))
-                  }
-                  placeholder="https://..."
-                />
-              </div>
-
-              {formData.image && (
-                <div className="w-32 h-32 rounded-lg overflow-hidden border border-slate-200">
-                  <img
-                    src={formData.image}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/placeholder.png";
-                    }}
-                  />
-                </div>
-              )}
+            <CardContent>
+              <ImageUpload
+                label="URL o archivo"
+                value={formData.image}
+                onChange={(url) => setFormData((prev) => ({ ...prev, image: url }))}
+              />
             </CardContent>
           </Card>
         </div>

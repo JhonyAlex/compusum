@@ -27,6 +27,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ImageUpload } from "@/components/admin/image-upload";
 
 interface Product {
   id: string;
@@ -449,14 +450,15 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Add Image */}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="https://ejemplo.com/imagen.jpg"
-                  value={newImageUrl}
-                  onChange={(e) => setNewImageUrl(e.target.value)}
-                  className="flex-1"
-                />
-                <Button type="button" onClick={addImage} variant="outline">
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <ImageUpload
+                    value={newImageUrl}
+                    onChange={setNewImageUrl}
+                    placeholder="https://ejemplo.com/imagen.jpg"
+                  />
+                </div>
+                <Button type="button" onClick={addImage} variant="outline" className="shrink-0 mb-0.5">
                   <Plus className="h-4 w-4 mr-2" />
                   Agregar
                 </Button>
