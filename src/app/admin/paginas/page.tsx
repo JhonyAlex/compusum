@@ -104,7 +104,7 @@ export default async function AdminPagesPage() {
                     name="contact_email"
                     type="email"
                     defaultValue={settingsMap.contact_email || ""}
-                    placeholder="info@compusum.com"
+                    placeholder="info@compusum.co"
                   />
                 </div>
               </div>

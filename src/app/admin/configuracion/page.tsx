@@ -202,7 +202,7 @@ export default async function AdminConfigPage() {
                         name="contact_email_global"
                         type="email"
                         defaultValue={settingsMap.contact_email_global || ""}
-                        placeholder="info@compusum.com"
+                        placeholder="info@compusum.co"
                       />
                     </div>
                   </div>

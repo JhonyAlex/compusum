@@ -154,7 +154,7 @@ export default function NosotrosPage() {
                     <Mail className="h-6 w-6 text-[#0D4DAA] mt-1" />
                     <div>
                       <p className="font-medium">Email</p>
-                      <a href="mailto:info@compusum.com" className="text-gray-500 hover:text-[#0D4DAA]">info@compusum.com</a>
+                      <a href="mailto:info@compusum.co" className="text-gray-500 hover:text-[#0D4DAA]">info@compusum.co</a>
                     </div>
                   </div>
                   <div className="flex items-start gap-4">

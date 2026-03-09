@@ -50,9 +50,9 @@ export function Header() {
                 <Phone className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">606 333-5206</span>
               </a>
-              <a href="mailto:info@compusum.com" className="hidden md:flex items-center gap-2 text-slate-300 hover:text-white transition-colors">
+              <a href="mailto:info@compusum.co" className="hidden md:flex items-center gap-2 text-slate-300 hover:text-white transition-colors">
                 <Mail className="h-3.5 w-3.5" />
-                <span>info@compusum.com</span>
+                <span>info@compusum.co</span>
               </a>
             </div>
             <div className="flex items-center gap-4">

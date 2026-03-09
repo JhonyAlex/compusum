@@ -47,7 +47,7 @@ Work Log:
 
 Stage Summary:
 - Seed completo ejecutado exitosamente
-- Usuario admin: admin@compusum.com / Compusum2025!
+- Usuario admin: admin@compusum.co / Compusum2025!
 
 ---
 Task ID: 4-5-6-7-8

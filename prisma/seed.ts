@@ -22,11 +22,11 @@ async function main() {
   const hashedPassword = await bcrypt.hash('Compusum2025!', 12);
   
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@compusum.com' },
+    where: { email: 'admin@compusum.co' },
     update: {},
     create: {
       name: 'Administrador Compusum',
-      email: 'admin@compusum.com',
+      email: 'admin@compusum.co',
       password: hashedPassword,
       role: 'admin',
       isActive: true,

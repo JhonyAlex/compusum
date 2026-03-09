@@ -180,7 +180,7 @@ export default function ContactoPage() {
                       </div>
                       <div>
                         <p className="font-semibold text-[#1a1a2e]">Email</p>
-                        <a href="mailto:info@compusum.com" className="text-gray-500 hover:text-[#0D4DAA]">info@compusum.com</a>
+                        <a href="mailto:info@compusum.co" className="text-gray-500 hover:text-[#0D4DAA]">info@compusum.co</a>
                       </div>
                     </div>
                     <div className="flex items-start gap-4">

@@ -210,9 +210,9 @@ UPLOAD_PATH=./public/uploads
 # === CORREO (Nodemailer) ===
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
-MAIL_USER=info@compusum.com
+MAIL_USER=info@compusum.co
 MAIL_PASS=app_password_aqui
-MAIL_FROM="Compusum <info@compusum.com>"
+MAIL_FROM="Compusum <info@compusum.co>"
 
 # === WHATSAPP ===
 WHATSAPP_NUMBER=576063335206
@@ -441,7 +441,7 @@ PROMPT PARA IA / INSTRUCCIÓN:
 
 1. **seeds/adminSeed.js** — Crea un usuario admin:
    - nombre: 'Administrador Compusum'
-   - email: 'admin@compusum.com'
+   - email: 'admin@compusum.co'
    - password: hasheada con bcrypt (ej: 'Compusum2025!')
    - role: 'admin'
 
@@ -466,7 +466,7 @@ PROMPT PARA IA / INSTRUCCIÓN:
    - store_slogan: 'Tu papelería al por mayor'
    - store_phone: '606 333-5206'
    - store_address: 'Carrera 6 #24-14, Pereira, Risaralda'
-   - store_email: 'info@compusum.com'
+   - store_email: 'info@compusum.co'
    - whatsapp_number: '576063335206'
    - instagram: '@compusumsas'
    - facebook: 'Compusum S.A.S.'
@@ -1258,7 +1258,7 @@ PASOS DE CONFIGURACIÓN:
    - Verificar acceso a /admin/login.
 
 5. CONFIGURAR DOMINIO:
-   - Apuntar DNS del dominio (ej: compusum.com.co) a IP de Spaceship.
+   - Apuntar DNS del dominio (ej: compusum.co) a IP de Spaceship.
    - Configurar SSL (Let's Encrypt o el que ofrezca Spaceship).
    - Forzar HTTPS (redirect).
 
@@ -1361,5 +1361,5 @@ Luego avanza fase por fase, siempre proporcionando el contexto de lo que ya est�
 
 ---
 
-*Documento creado como guía maestra para el desarrollo de compusum.com.co*
+*Documento creado como guía maestra para el desarrollo de compusum.co*
 *Última actualización: Febrero 2026*

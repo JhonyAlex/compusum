@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Compusum | Tu Papelería al por Mayor",
     description: "Papelería mayorista en Pereira, Colombia. Distribuidores de las mejores marcas.",
-    url: "https://compusum.com.co",
+    url: "https://compusum.co",
     siteName: "Compusum",
     type: "website",
     locale: "es_CO",

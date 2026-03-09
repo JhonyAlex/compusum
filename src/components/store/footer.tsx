@@ -73,8 +73,8 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Mail className="h-4 w-4 text-slate-500" />
-                <a href="mailto:info@compusum.com" className="text-slate-400 hover:text-white transition-colors">
-                  info@compusum.com
+                <a href="mailto:info@compusum.co" className="text-slate-400 hover:text-white transition-colors">
+                  info@compusum.co
                 </a>
               </div>
               <div className="flex items-center gap-3 text-sm text-slate-400">
