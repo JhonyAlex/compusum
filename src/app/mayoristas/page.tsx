@@ -61,7 +61,7 @@ export default function MayoristasPage() {
                       Cotizar por WhatsApp
                     </a>
                   </Button>
-                  <Button asChild size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-[#0D4DAA]">
+                  <Button asChild size="lg" variant="outline" className="border-white text-white bg-transparent hover:bg-white hover:text-[#0D4DAA]">
                     <Link href="/catalogo">Ver catálogo</Link>
                   </Button>
                 </div>
