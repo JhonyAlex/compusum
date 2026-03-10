@@ -515,47 +515,111 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* Brands Section */}
-        <section className="py-10 sm:py-16 md:py-24 bg-white">
-          <div className="container mx-auto px-4">
-            <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-12">
-              <Badge variant="outline" className="border-slate-300 text-slate-600 mb-3 sm:mb-4">
-                Distribuidores autorizados
-              </Badge>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-3 sm:mb-4" style={{ fontFamily: "var(--font-fredoka)" }}>
-                Trabajamos con las mejores marcas
+        {/* Brands Section - Modern Design */}
+        <section className="relative py-16 sm:py-20 md:py-28 overflow-hidden">
+          {/* Background with subtle gradient */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white via-gray-50/50 to-white" />
+          
+          {/* Decorative elements */}
+          <div className="absolute top-20 left-10 w-64 h-64 bg-[#0D4DAA]/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-[#E89A00]/5 rounded-full blur-3xl" />
+          
+          <div className="container mx-auto px-4 relative z-10">
+            {/* Section Header */}
+            <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
+              {/* Animated Badge */}
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#0D4DAA]/10 to-[#E89A00]/10 
+                              backdrop-blur-sm border border-[#0D4DAA]/20 rounded-full px-5 py-2 mb-6">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E89A00] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#E89A00]"></span>
+                </span>
+                <span className="text-sm font-medium text-[#0D4DAA]">Distribuidores autorizados</span>
+              </div>
+              
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4" 
+                  style={{ fontFamily: "var(--font-fredoka)" }}>
+                Trabajamos con las{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0D4DAA] to-[#E89A00]">
+                  mejores marcas
+                </span>
               </h2>
-              <p className="text-slate-500 text-sm sm:text-lg">
-                Productos originales con garantía de calidad de fabricantes reconocidos.
+              
+              <p className="text-gray-500 text-base sm:text-lg max-w-xl mx-auto">
+                Productos originales con garantía de calidad de fabricantes reconocidos a nivel mundial.
               </p>
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-3">
-              {brands.map((brand) => (
+            {/* Brands Grid - Modern Card Design */}
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
+              {brands.map((brand, index) => (
                 <Link
                   key={brand.id}
                   href={`/catalogo?marca=${brand.slug}`}
-                  className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-xl bg-gray-50 hover:bg-white hover:shadow-md border border-transparent hover:border-gray-100 transition-all duration-200"
+                  className="group relative"
+                  style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <div className="w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center">
-                    <img
-                      src={brand.logo || `https://picsum.photos/seed/${brand.slug}/56/56`}
-                      alt={brand.name}
-                      className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-200"
-                    />
+                  <div className="relative bg-white rounded-2xl overflow-hidden border border-gray-100 
+                                  transition-all duration-500 ease-out
+                                  hover:border-[#0D4DAA]/30 hover:shadow-xl hover:shadow-[#0D4DAA]/10
+                                  hover:-translate-y-1">
+                    
+                    {/* Gradient Overlay on Hover */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#0D4DAA]/0 to-[#E89A00]/0 
+                                    group-hover:from-[#0D4DAA]/5 group-hover:to-[#E89A00]/5 
+                                    transition-all duration-500 rounded-2xl" />
+
+                    {/* Logo Container */}
+                    <div className="relative aspect-square bg-gradient-to-br from-gray-50 to-white 
+                                    flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+                      {/* Background Pattern */}
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(13,77,170,0.05),transparent_70%)]" />
+                      </div>
+
+                      {/* Logo Image */}
+                      <img
+                        src={brand.logo || `https://picsum.photos/seed/${brand.slug}/100/100`}
+                        alt={brand.name}
+                        className="relative w-full h-full object-contain 
+                                   transition-all duration-500 ease-out
+                                   group-hover:scale-110 group-hover:brightness-110
+                                   filter grayscale-[20%] group-hover:grayscale-0"
+                      />
+
+                      {/* Shine Effect */}
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                        <div className="absolute -inset-full top-0 left-0 w-1/2 h-full 
+                                        bg-gradient-to-r from-transparent via-white/20 to-transparent 
+                                        transform -skew-x-12 group-hover:translate-x-[200%] 
+                                        transition-transform duration-1000 ease-out" />
+                      </div>
+                    </div>
+
+                    {/* Brand Name */}
+                    <div className="px-2 py-2 sm:px-3 sm:py-3 bg-white border-t border-gray-50">
+                      <p className="text-[10px] sm:text-xs font-medium text-gray-700 group-hover:text-[#0D4DAA] 
+                                    transition-colors duration-300 text-center truncate">
+                        {brand.name}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 text-center leading-tight line-clamp-2">
-                    {brand.name}
-                  </p>
                 </Link>
               ))}
             </div>
 
-            <div className="text-center mt-6 sm:mt-8">
-              <Button asChild variant="link" className="text-slate-600 text-sm sm:text-base">
-                <Link href="/marcas">
+            {/* View All CTA */}
+            <div className="text-center mt-10 sm:mt-12">
+              <Button 
+                asChild 
+                className="bg-white border-2 border-[#0D4DAA] text-[#0D4DAA] hover:bg-[#0D4DAA] hover:text-white
+                           px-8 py-6 text-base sm:text-lg font-medium
+                           shadow-lg shadow-[#0D4DAA]/10 hover:shadow-xl hover:shadow-[#0D4DAA]/20
+                           transition-all duration-300 hover:-translate-y-0.5"
+              >
+                <Link href="/marcas" className="flex items-center gap-2">
                   Ver todas las marcas
-                  <ArrowRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
+                  <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
             </div>
