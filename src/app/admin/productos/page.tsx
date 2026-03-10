@@ -59,11 +59,11 @@ export default async function AdminProductsPage({ searchParams }: Props) {
     ];
   }
 
-  if (params.categoria) {
+  if (params.categoria && params.categoria !== "all") {
     where.categoryId = params.categoria;
   }
 
-  if (params.marca) {
+  if (params.marca && params.marca !== "all") {
     where.brandId = params.marca;
   }
 
@@ -133,12 +133,12 @@ export default async function AdminProductsPage({ searchParams }: Props) {
               </div>
 
               {/* Category Filter */}
-              <Select name="categoria" defaultValue={params.categoria || ""}>
+              <Select name="categoria" defaultValue={params.categoria || "all"}>
                 <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   {categories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {cat.name}
@@ -148,12 +148,12 @@ export default async function AdminProductsPage({ searchParams }: Props) {
               </Select>
 
               {/* Brand Filter */}
-              <Select name="marca" defaultValue={params.marca || ""}>
+              <Select name="marca" defaultValue={params.marca || "all"}>
                 <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Marca" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   {brands.map((brand) => (
                     <SelectItem key={brand.id} value={brand.id}>
                       {brand.name}
@@ -163,12 +163,12 @@ export default async function AdminProductsPage({ searchParams }: Props) {
               </Select>
 
               {/* Status Filter */}
-              <Select name="estado" defaultValue={params.estado || ""}>
+              <Select name="estado" defaultValue={params.estado || "all"}>
                 <SelectTrigger className="w-full sm:w-36">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="activo">Activos</SelectItem>
                   <SelectItem value="inactivo">Inactivos</SelectItem>
                 </SelectContent>
@@ -189,7 +189,9 @@ export default async function AdminProductsPage({ searchParams }: Props) {
                 size="sm"
                 asChild
               >
-                <Link href={`/admin/productos${buildQueryString({ destacado: params.destacado === "true" ? undefined : "true" })}`}>
+                <Link
+                  href={`/admin/productos${buildQueryString({ destacado: params.destacado === "true" ? undefined : "true" })}`}
+                >
                   <Star className="h-3.5 w-3.5 mr-1" />
                   Destacados
                 </Link>
@@ -199,16 +201,21 @@ export default async function AdminProductsPage({ searchParams }: Props) {
                 size="sm"
                 asChild
               >
-                <Link href={`/admin/productos${buildQueryString({ nuevo: params.nuevo === "true" ? undefined : "true" })}`}>
+                <Link
+                  href={`/admin/productos${buildQueryString({ nuevo: params.nuevo === "true" ? undefined : "true" })}`}
+                >
                   <Sparkles className="h-3.5 w-3.5 mr-1" />
                   Nuevos
                 </Link>
               </Button>
-              {(params.search || params.categoria || params.marca || params.destacado || params.nuevo || params.estado) && (
+              {(params.search ||
+                params.categoria ||
+                params.marca ||
+                params.destacado ||
+                params.nuevo ||
+                params.estado) && (
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/admin/productos">
-                    Limpiar filtros
-                  </Link>
+                  <Link href="/admin/productos">Limpiar filtros</Link>
                 </Button>
               )}
             </div>
@@ -264,7 +271,9 @@ export default async function AdminProductsPage({ searchParams }: Props) {
                                 {product.name}
                               </p>
                               {product.sku && (
-                                <p className="text-xs text-slate-500">{product.sku}</p>
+                                <p className="text-xs text-slate-500">
+                                  {product.sku}
+                                </p>
                               )}
                             </div>
                           </div>
@@ -288,7 +297,8 @@ export default async function AdminProductsPage({ searchParams }: Props) {
                             )}
                             {product.wholesalePrice && (
                               <p className="text-xs text-green-600">
-                                May: ${product.wholesalePrice.toLocaleString("es-CO")}
+                                May: $
+                                {product.wholesalePrice.toLocaleString("es-CO")}
                               </p>
                             )}
                           </div>
@@ -296,13 +306,19 @@ export default async function AdminProductsPage({ searchParams }: Props) {
                         <td className="py-3 px-4">
                           <div className="flex gap-1">
                             {product.isFeatured && (
-                              <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">
+                              <Badge
+                                variant="secondary"
+                                className="text-xs bg-amber-100 text-amber-700"
+                              >
                                 <Star className="h-3 w-3 mr-1" />
                                 Destacado
                               </Badge>
                             )}
                             {product.isNew && (
-                              <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+                              <Badge
+                                variant="secondary"
+                                className="text-xs bg-green-100 text-green-700"
+                              >
                                 <Sparkles className="h-3 w-3 mr-1" />
                                 Nuevo
                               </Badge>
@@ -311,7 +327,10 @@ export default async function AdminProductsPage({ searchParams }: Props) {
                         </td>
                         <td className="py-3 px-4">
                           {product.isActive ? (
-                            <Badge variant="outline" className="text-green-600 border-green-200">
+                            <Badge
+                              variant="outline"
+                              className="text-green-600 border-green-200"
+                            >
                               Activo
                             </Badge>
                           ) : (
@@ -323,7 +342,10 @@ export default async function AdminProductsPage({ searchParams }: Props) {
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="sm" asChild>
-                              <Link href={`/producto/${product.slug}`} target="_blank">
+                              <Link
+                                href={`/producto/${product.slug}`}
+                                target="_blank"
+                              >
                                 <Eye className="h-4 w-4" />
                               </Link>
                             </Button>
