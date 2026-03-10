@@ -23,6 +23,7 @@ import {
   Search,
   Save,
   Store,
+  Webhook,
 } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
@@ -66,7 +67,7 @@ export default async function AdminConfigPage() {
 
       <div className="p-4 sm:p-6">
         <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="general">
               <Store className="h-4 w-4 mr-2" />
               General
@@ -82,6 +83,10 @@ export default async function AdminConfigPage() {
             <TabsTrigger value="seo">
               <Search className="h-4 w-4 mr-2" />
               SEO
+            </TabsTrigger>
+            <TabsTrigger value="integrations">
+              <Webhook className="h-4 w-4 mr-2" />
+              Integraciones
             </TabsTrigger>
           </TabsList>
 
@@ -310,7 +315,7 @@ export default async function AdminConfigPage() {
               <CardContent>
                 <form action={saveSettings} className="space-y-4">
                   <input type="hidden" name="_group" value="seo" />
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="meta_title">Meta título</Label>
                     <Input
@@ -348,6 +353,136 @@ export default async function AdminConfigPage() {
                     />
                     <p className="text-xs text-slate-500">
                       Separadas por coma
+                    </p>
+                  </div>
+
+                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar configuración
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Integrations Settings */}
+          <TabsContent value="integrations">
+            <Card>
+              <CardHeader>
+                <CardTitle>Integraciones</CardTitle>
+                <CardDescription>
+                  Configuración de N8N, webhooks y notificaciones de pedidos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={saveSettings} className="space-y-6">
+                  <input type="hidden" name="_group" value="integrations" />
+
+                  {/* N8N Webhook */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
+                      Webhook N8N
+                    </h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="n8n_webhook_url">URL del Webhook</Label>
+                      <Input
+                        id="n8n_webhook_url"
+                        name="n8n_webhook_url"
+                        defaultValue={settingsMap.n8n_webhook_url || ""}
+                        placeholder="https://n8n.compusum.co/webhook/pedidos"
+                      />
+                      <p className="text-xs text-slate-500">
+                        URL donde se enviarán los datos del pedido automáticamente
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="n8n_webhook_enabled">Estado del Webhook</Label>
+                      <Select
+                        name="n8n_webhook_enabled"
+                        defaultValue={settingsMap.n8n_webhook_enabled || "false"}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Activo</SelectItem>
+                          <SelectItem value="false">Inactivo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Email Notifications */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
+                      Notificaciones por email
+                    </h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="order_notification_email">Email de notificaciones</Label>
+                      <Input
+                        id="order_notification_email"
+                        name="order_notification_email"
+                        type="email"
+                        defaultValue={settingsMap.order_notification_email || ""}
+                        placeholder="pedidos@compusum.co"
+                      />
+                      <p className="text-xs text-slate-500">
+                        Correo donde se recibirán las notificaciones de nuevos pedidos
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="order_email_enabled">Notificaciones por email</Label>
+                      <Select
+                        name="order_email_enabled"
+                        defaultValue={settingsMap.order_email_enabled || "false"}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Activo</SelectItem>
+                          <SelectItem value="false">Inactivo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* WhatsApp for Orders */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
+                      WhatsApp para pedidos
+                    </h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="order_whatsapp_enabled">Enviar pedidos por WhatsApp</Label>
+                      <Select
+                        name="order_whatsapp_enabled"
+                        defaultValue={settingsMap.order_whatsapp_enabled || "true"}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Activo</SelectItem>
+                          <SelectItem value="false">Inactivo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-slate-500">
+                        Usa el número de WhatsApp configurado en la pestaña Contacto
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Callback info */}
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                    <h4 className="text-sm font-medium text-slate-700">URL de callback N8N</h4>
+                    <p className="text-xs text-slate-500">
+                      Configura esta URL en tu flujo de N8N para confirmar la recepción de pedidos:
+                    </p>
+                    <code className="text-xs bg-white px-3 py-2 rounded border block text-slate-700 break-all">
+                      {`POST /api/webhooks/n8n`}
+                    </code>
+                    <p className="text-xs text-slate-400">
+                      Body: {`{ "orderNumber": "CS-...", "status": "recibido" }`}
                     </p>
                   </div>
 

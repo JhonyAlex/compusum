@@ -8,6 +8,8 @@ import {
   Package,
   FolderTree,
   Tags,
+  ShoppingCart,
+  ClipboardList,
   FileText,
   Settings,
   LogOut,
@@ -23,6 +25,8 @@ const navigation = [
   { name: "Productos", href: "/admin/productos", icon: Package },
   { name: "Categorías", href: "/admin/categorias", icon: FolderTree },
   { name: "Marcas", href: "/admin/marcas", icon: Tags },
+  { name: "Carritos", href: "/admin/carritos", icon: ShoppingCart },
+  { name: "Pedidos", href: "/admin/pedidos", icon: ClipboardList },
   { name: "Páginas", href: "/admin/paginas", icon: FileText },
   { name: "Configuración", href: "/admin/configuracion", icon: Settings },
 ];

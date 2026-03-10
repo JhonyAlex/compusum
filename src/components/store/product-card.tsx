@@ -6,6 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircle, Sparkles, Package } from "lucide-react";
+import { AddToCartButton } from "@/components/store/add-to-cart-button";
+import { formatPrice } from "@/lib/format";
+import type { CartProduct } from "@/stores/cart-store";
 
 interface Product {
   id: string;
@@ -31,16 +34,6 @@ interface Product {
 interface ProductCardProps {
   product: Product;
   variant?: "default" | "compact";
-}
-
-function formatPrice(price: number | null | undefined): string {
-  if (!price) return "";
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(price);
 }
 
 export function ProductCard({ product, variant = "default" }: ProductCardProps) {
@@ -173,17 +166,24 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
           )}
         </div>
 
-        {/* CTA Button */}
-        <Button
-          asChild
-          size="sm"
-          className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white gap-1.5 text-xs h-9"
-        >
-          <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-            <MessageCircle className="h-3.5 w-3.5" />
-            Cotizar
-          </a>
-        </Button>
+        {/* CTA Buttons */}
+        <div className="flex gap-2 mt-4">
+          <AddToCartButton
+            product={product as CartProduct}
+            variant="icon"
+            className="flex-1"
+          />
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="border-green-200 text-green-700 hover:bg-green-50 gap-1 text-xs h-9 px-2.5"
+          >
+            <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

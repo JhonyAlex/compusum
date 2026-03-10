@@ -3,39 +3,27 @@ import { Header } from "@/components/store/header";
 import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
 import { ProductCard } from "@/components/store/product-card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { 
-  MessageCircle, 
-  Share2, 
-  Minus, 
-  Plus, 
+import {
+  MessageCircle,
   Star,
   Sparkles,
   Truck,
   Shield,
   ChevronRight
 } from "lucide-react";
+import { ProductDetailCTA } from "@/components/store/product-detail-cta";
+import { formatPrice } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-}
-
-function formatPrice(price: number | null | undefined): string {
-  if (!price) return "";
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(price);
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -109,9 +97,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
   } catch (error) {
     console.error("Product view count update failed", error);
   }
-
-  const whatsappMessage = `Hola, quiero cotizar: ${product.name}${product.sku ? ` (Ref: ${product.sku})` : ""}`;
-  const whatsappUrl = `https://wa.me/576063335206?text=${encodeURIComponent(whatsappMessage)}`;
 
   const stockStatusColors = {
     disponible: "bg-green-500",
@@ -271,26 +256,20 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 )}
 
                 {/* CTA Buttons */}
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Button
-                    asChild
-                    size="lg"
-                    className="bg-[#25D366] hover:bg-[#20BA5A] text-white gap-2 flex-1"
-                  >
-                    <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                      <MessageCircle className="h-5 w-5" />
-                      Cotizar por WhatsApp
-                    </a>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="border-[#0D4DAA] text-[#0D4DAA] hover:bg-[#0D4DAA] hover:text-white gap-2"
-                  >
-                    <Share2 className="h-5 w-5" />
-                    Compartir
-                  </Button>
-                </div>
+                <ProductDetailCTA
+                  product={{
+                    id: product.id,
+                    name: product.name,
+                    slug: product.slug,
+                    sku: product.sku,
+                    price: product.price,
+                    wholesalePrice: product.wholesalePrice,
+                    minWholesaleQty: product.minWholesaleQty,
+                    stockStatus: product.stockStatus,
+                    brand: product.brand ? { name: product.brand.name, slug: product.brand.slug } : null,
+                    category: product.category ? { name: product.category.name, slug: product.category.slug } : null,
+                  }}
+                />
 
                 {/* Benefits */}
                 <div className="grid grid-cols-2 gap-4 pt-4">

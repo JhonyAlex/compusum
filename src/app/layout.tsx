@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fredoka, Poppins } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { CartProvider } from "@/components/store/cart-provider";
 
 const fredoka = Fredoka({
   variable: "--font-fredoka",
@@ -46,6 +47,7 @@ export default function RootLayout({
         className={`${fredoka.variable} ${poppins.variable} antialiased bg-background text-foreground`}
       >
         {children}
+        <CartProvider />
         <Toaster />
       </body>
     </html>

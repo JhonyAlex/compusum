@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CartIconButton } from "@/components/store/cart-icon-button";
 
 const navigation = [
   { name: "Inicio", href: "/" },
@@ -136,6 +137,9 @@ export function Header() {
 
           {/* Actions */}
           <div className="flex items-center gap-3">
+            {/* Cart Button */}
+            <CartIconButton />
+
             {/* CTA Button */}
             <Button
               asChild
