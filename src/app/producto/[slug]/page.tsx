@@ -62,7 +62,7 @@ export async function generateMetadata({ params }: PageProps) {
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
 
-  let product: Awaited<ReturnType<typeof db.product.findUnique>> = null;
+  let product: Awaited<ReturnType<typeof db.product.findUnique<{ where: { slug: string }; include: { brand: true; category: { include: { parent: true } }; images: { orderBy: { sortOrder: 'asc' } } } }>>> = null;
 
   try {
     product = await db.product.findUnique({
@@ -84,7 +84,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   }
 
   // Get related products
-  let relatedProducts: Awaited<ReturnType<typeof db.product.findMany>> = [];
+  let relatedProducts: Awaited<ReturnType<typeof db.product.findMany<{ include: { brand: true; category: true } }>>> = [];
 
   try {
     relatedProducts = await db.product.findMany({
@@ -211,8 +211,12 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     href={`/marcas/${product.brand.slug}`}
                     className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-[#0D4DAA]"
                   >
-                    <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                      <span className="font-bold text-[#0D4DAA]">{product.brand.name.charAt(0)}</span>
+                    <div className="w-8 h-8 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
+                      <img
+                        src={product.brand.logo || `https://picsum.photos/seed/${product.brand.slug}/32/32`}
+                        alt={product.brand.name}
+                        className="w-full h-full object-contain p-0.5"
+                      />
                     </div>
                     {product.brand.name}
                   </Link>

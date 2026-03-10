@@ -538,10 +538,12 @@ export default async function HomePage() {
                   className="group bg-slate-50 border border-slate-100 rounded-lg sm:rounded-xl p-2 sm:p-4 flex items-center justify-center aspect-square hover:border-blue-200 hover:bg-blue-50/50 transition-all"
                 >
                   <div className="text-center">
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 mx-auto bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:shadow transition-shadow">
-                      <span className="text-sm sm:text-xl font-bold text-slate-700">
-                        {brand.name.charAt(0)}
-                      </span>
+                    <div className="w-8 h-8 sm:w-12 sm:h-12 mx-auto bg-white rounded-lg overflow-hidden shadow-sm group-hover:shadow transition-shadow flex items-center justify-center">
+                      <img
+                        src={brand.logo || `https://picsum.photos/seed/${brand.slug}/48/48`}
+                        alt={brand.name}
+                        className="w-full h-full object-contain p-0.5"
+                      />
                     </div>
                     <p className="text-[10px] sm:text-xs font-medium text-slate-600 mt-1 sm:mt-2 truncate">
                       {brand.name}

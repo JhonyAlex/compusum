@@ -9,7 +9,7 @@ import { ExternalLink } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function MarcasPage() {
-  let brands: Awaited<ReturnType<typeof db.brand.findMany>> = [];
+  let brands: Awaited<ReturnType<typeof db.brand.findMany<{ where: { isActive: boolean }, include: { _count: { select: { products: { where: { isActive: boolean } } } } } }>>> = [];
 
   try {
     brands = await db.brand.findMany({
@@ -23,14 +23,7 @@ export default async function MarcasPage() {
     console.error("MarcasPage query failed", error);
   }
 
-  const brandColors = [
-    "bg-[#0D4DAA]",
-    "bg-[#E89A00]",
-    "bg-[#FF6A00]",
-    "bg-[#6DA8FF]",
-    "bg-[#1a1a2e]",
-    "bg-[#25D366]",
-  ];
+
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -53,16 +46,18 @@ export default async function MarcasPage() {
         <section className="py-12">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {brands.map((brand, index) => (
+              {brands.map((brand) => (
                 <Link
                   key={brand.id}
                   href={`/catalogo?marca=${brand.slug}`}
                   className="group bg-white border rounded-2xl p-6 hover:shadow-xl hover:border-[#0D4DAA]/30 transition-all duration-300"
                 >
-                  <div className={`w-20 h-20 ${brandColors[index % brandColors.length]} rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}>
-                    <span className="text-2xl font-bold text-white" style={{ fontFamily: "var(--font-fredoka)" }}>
-                      {brand.name.charAt(0)}
-                    </span>
+                  <div className="w-20 h-20 rounded-xl overflow-hidden mx-auto mb-4 group-hover:scale-110 transition-transform bg-gray-50 border border-gray-100 flex items-center justify-center">
+                    <img
+                      src={brand.logo || `https://picsum.photos/seed/${brand.slug}/80/80`}
+                      alt={brand.name}
+                      className="w-full h-full object-contain p-1"
+                    />
                   </div>
                   <h3 className="text-lg font-semibold text-[#1a1a2e] text-center group-hover:text-[#0D4DAA] transition-colors">
                     {brand.name}
