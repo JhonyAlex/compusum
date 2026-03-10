@@ -37,7 +37,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 EXPOSE 3000
 
-# Iniciamos utilizando bun apuntando al server originado en standalone
-CMD ["sh", "-c", "mkdir -p /app/public/uploads && set -e; if [ -d prisma/migrations ] && [ \"$(ls -A prisma/migrations 2>/dev/null)\" ]; then echo 'Applying Prisma migrations...'; ./node_modules/.bin/prisma migrate deploy; else echo 'No migrations found, running prisma db push...'; ./node_modules/.bin/prisma db push --accept-data-loss; fi; echo 'Running seed...'; bun run seed; bun server.js"]
+CMD ["./docker-entrypoint.sh"]
