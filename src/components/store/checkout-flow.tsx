@@ -309,7 +309,7 @@ export function CheckoutFlow() {
               <div className="bg-slate-50 rounded-lg p-4 space-y-2 mb-6">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">Productos</span>
-                  <span className="font-medium">{itemCount} items</span>
+                  <span className="font-medium">{itemCount} productos</span>
                 </div>
                 {customerInfo.name && (
                   <div className="flex justify-between text-sm">

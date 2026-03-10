@@ -19,6 +19,7 @@ export function AddToCartButton({ product, variant = "icon", className }: AddToC
 
   const handleAdd = () => {
     addItem(product, variant === "full" ? quantity : 1);
+    setOpen(true);
     toast.success("Producto agregado al carrito", {
       description: product.name,
       action: {

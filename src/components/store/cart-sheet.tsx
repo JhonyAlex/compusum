@@ -42,7 +42,7 @@ export function CartSheet() {
               Carrito
               {itemCount > 0 && (
                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                  {itemCount} {itemCount === 1 ? "item" : "items"}
+                  {itemCount} {itemCount === 1 ? "producto" : "productos"}
                 </span>
               )}
             </SheetTitle>
@@ -120,7 +120,7 @@ export function CartSheet() {
                 >
                   <Link href="/checkout">
                     <ArrowRight className="h-4 w-4" />
-                    Continuar al checkout
+                    Realizar pedido
                   </Link>
                 </Button>
 

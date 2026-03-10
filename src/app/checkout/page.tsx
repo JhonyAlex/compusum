@@ -4,7 +4,7 @@ import { WhatsAppButton } from "@/components/store/whatsapp-button";
 import { CheckoutFlow } from "@/components/store/checkout-flow";
 
 export const metadata = {
-  title: "Checkout | Compusum",
+  title: "Realizar pedido | Compusum",
   description: "Finaliza tu pedido en Compusum - Papelería Mayorista",
 };
 
