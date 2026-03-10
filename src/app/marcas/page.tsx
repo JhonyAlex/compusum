@@ -4,7 +4,6 @@ import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -45,32 +44,24 @@ export default async function MarcasPage() {
         {/* Brands Grid */}
         <section className="py-12">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
               {brands.map((brand) => (
                 <Link
                   key={brand.id}
                   href={`/catalogo?marca=${brand.slug}`}
-                  className="group bg-white border rounded-2xl p-6 hover:shadow-xl hover:border-[#0D4DAA]/30 transition-all duration-300"
+                  className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-300"
                 >
-                  <div className="w-20 h-20 rounded-xl overflow-hidden mx-auto mb-4 group-hover:scale-110 transition-transform bg-gray-50 border border-gray-100 flex items-center justify-center">
+                  <div className="aspect-square bg-gray-50 flex items-center justify-center p-5">
                     <img
-                      src={brand.logo || `https://picsum.photos/seed/${brand.slug}/80/80`}
+                      src={brand.logo || `https://picsum.photos/seed/${brand.slug}/200/200`}
                       alt={brand.name}
-                      className="w-full h-full object-contain p-1"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
-                  <h3 className="text-lg font-semibold text-[#1a1a2e] text-center group-hover:text-[#0D4DAA] transition-colors">
-                    {brand.name}
-                  </h3>
-                  <p className="text-sm text-gray-500 text-center mt-1">
-                    {brand._count.products} productos
-                  </p>
-                  {brand.website && (
-                    <p className="text-xs text-[#0D4DAA] text-center mt-2 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Ver sitio web
-                      <ExternalLink className="h-3 w-3" />
-                    </p>
-                  )}
+                  <div className="px-4 py-3 border-t border-gray-50">
+                    <p className="font-semibold text-sm text-gray-900 truncate">{brand.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{brand._count.products} productos</p>
+                  </div>
                 </Link>
               ))}
             </div>

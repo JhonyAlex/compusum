@@ -530,25 +530,23 @@ export default async function HomePage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-3">
               {brands.map((brand) => (
-                <Link 
+                <Link
                   key={brand.id}
                   href={`/catalogo?marca=${brand.slug}`}
-                  className="group bg-slate-50 border border-slate-100 rounded-lg sm:rounded-xl p-2 sm:p-4 flex items-center justify-center aspect-square hover:border-blue-200 hover:bg-blue-50/50 transition-all"
+                  className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-xl bg-gray-50 hover:bg-white hover:shadow-md border border-transparent hover:border-gray-100 transition-all duration-200"
                 >
-                  <div className="text-center">
-                    <div className="w-8 h-8 sm:w-12 sm:h-12 mx-auto bg-white rounded-lg overflow-hidden shadow-sm group-hover:shadow transition-shadow flex items-center justify-center">
-                      <img
-                        src={brand.logo || `https://picsum.photos/seed/${brand.slug}/48/48`}
-                        alt={brand.name}
-                        className="w-full h-full object-contain p-0.5"
-                      />
-                    </div>
-                    <p className="text-[10px] sm:text-xs font-medium text-slate-600 mt-1 sm:mt-2 truncate">
-                      {brand.name}
-                    </p>
+                  <div className="w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center">
+                    <img
+                      src={brand.logo || `https://picsum.photos/seed/${brand.slug}/56/56`}
+                      alt={brand.name}
+                      className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-200"
+                    />
                   </div>
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 text-center leading-tight line-clamp-2">
+                    {brand.name}
+                  </p>
                 </Link>
               ))}
             </div>
