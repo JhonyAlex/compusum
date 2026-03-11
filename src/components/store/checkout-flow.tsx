@@ -38,6 +38,7 @@ export function CheckoutFlow() {
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [whatsappPhone, setWhatsappPhone] = useState("576063335206");
+  const [catalogMode, setCatalogMode] = useState(false);
   const items = useCartStore((s) => s.items);
   const customerInfo = useCartStore((s) => s.customerInfo);
   const setCustomerInfo = useCartStore((s) => s.setCustomerInfo);
@@ -46,13 +47,20 @@ export function CheckoutFlow() {
   const subtotal = useCartStore(getSubtotal);
   const itemCount = useCartStore(getItemCount);
 
-  // Fetch WhatsApp phone from settings
+  // Fetch settings (WhatsApp phone + catalog mode)
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
         const phone = data.data?.contact?.whatsapp_global?.value;
         if (phone) setWhatsappPhone(phone);
+      })
+      .catch(() => {});
+
+    fetch("/api/catalog-mode")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) setCatalogMode(data.data.catalogMode);
       })
       .catch(() => {});
   }, []);
@@ -97,22 +105,23 @@ export function CheckoutFlow() {
   };
 
   const generateWhatsAppMessage = () => {
-    let msg = "*Pedido CompuSum* 🛒\n\n";
+    const isCatalogQuote = catalogMode;
+    let msg = isCatalogQuote ? "*Cotización CompuSum* 📋\n\n" : "*Pedido CompuSum* 🛒\n\n";
     if (customerInfo.name) msg += `*Cliente:* ${customerInfo.name}\n`;
     if (customerInfo.company) msg += `*Empresa:* ${customerInfo.company}\n`;
     if (customerInfo.phone) msg += `*Tel:* ${customerInfo.phone}\n`;
     if (customerInfo.email) msg += `*Email:* ${customerInfo.email}\n`;
-    msg += "\n*Productos:*\n";
+    msg += isCatalogQuote ? "\n*Productos a cotizar:*\n" : "\n*Productos:*\n";
 
     items.forEach((item, i) => {
       const price = item.product.wholesalePrice || item.product.price || 0;
       const ref = item.product.sku ? ` (Ref: ${item.product.sku})` : "";
       msg += `${i + 1}. ${item.product.name}${ref} x${item.quantity}`;
-      if (price) msg += ` - ${formatPrice(price)} c/u`;
+      if (!isCatalogQuote && price) msg += ` - ${formatPrice(price)} c/u`;
       msg += "\n";
     });
 
-    if (subtotal > 0) msg += `\n*Subtotal:* ${formatPrice(subtotal)}`;
+    if (!isCatalogQuote && subtotal > 0) msg += `\n*Subtotal:* ${formatPrice(subtotal)}`;
     if (customerInfo.notes) msg += `\n\n*Notas:* ${customerInfo.notes}`;
     return msg;
   };
@@ -211,21 +220,37 @@ export function CheckoutFlow() {
           {currentStep === 0 && (
             <div>
               <h2 className="text-lg font-semibold text-slate-900 mb-4">
-                Resumen del pedido ({itemCount} productos)
+                {catalogMode ? "Lista de cotización" : "Resumen del pedido"} ({itemCount} productos)
               </h2>
+              {catalogMode && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-amber-800">
+                    📋 <strong>Modo Catálogo:</strong> Los precios serán cotizados personalmente.
+                    Completa tus datos para recibir la cotización.
+                  </p>
+                </div>
+              )}
               <div className="space-y-1">
                 {items.map((item) => (
                   <CartItemRow key={item.product.id} item={item} />
                 ))}
               </div>
               <Separator className="my-4" />
-              <div className="flex justify-between items-center">
-                <span className="text-slate-600">Subtotal</span>
-                <span className="text-xl font-bold text-slate-900">{formatPrice(subtotal)}</span>
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                Precios mayoristas sujetos a confirmación
-              </p>
+              {catalogMode ? (
+                <p className="text-sm text-slate-500 italic">
+                  Los precios serán cotizados de forma personalizada
+                </p>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600">Subtotal</span>
+                    <span className="text-xl font-bold text-slate-900">{formatPrice(subtotal)}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Precios mayoristas sujetos a confirmación
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -303,7 +328,9 @@ export function CheckoutFlow() {
           {/* Step 3: Confirmar */}
           {currentStep === 3 && (
             <div>
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">Confirmar pedido</h2>
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                {catalogMode ? "Confirmar solicitud de cotización" : "Confirmar pedido"}
+              </h2>
 
               {/* Summary card */}
               <div className="bg-slate-50 rounded-lg p-4 space-y-2 mb-6">
@@ -324,10 +351,16 @@ export function CheckoutFlow() {
                   </div>
                 )}
                 <Separator />
-                <div className="flex justify-between">
-                  <span className="text-slate-600 font-medium">Subtotal</span>
-                  <span className="text-lg font-bold text-blue-600">{formatPrice(subtotal)}</span>
-                </div>
+                {catalogMode ? (
+                  <p className="text-sm text-slate-500 italic">
+                    Los precios serán cotizados de forma personalizada
+                  </p>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-slate-600 font-medium">Subtotal</span>
+                    <span className="text-lg font-bold text-blue-600">{formatPrice(subtotal)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
@@ -352,7 +385,11 @@ export function CheckoutFlow() {
                       }}
                     >
                       <MessageCircle className="h-5 w-5" />
-                      {creatingOrder ? "Creando pedido..." : "Enviar pedido por WhatsApp"}
+                      {creatingOrder
+                        ? "Procesando..."
+                        : catalogMode
+                        ? "Enviar solicitud de cotización por WhatsApp"
+                        : "Enviar pedido por WhatsApp"}
                     </Button>
 
                     <Button
@@ -362,7 +399,11 @@ export function CheckoutFlow() {
                       disabled={creatingOrder || saving}
                     >
                       <Save className="h-4 w-4" />
-                      {creatingOrder ? "Creando..." : "Crear pedido sin WhatsApp"}
+                      {creatingOrder
+                        ? "Creando..."
+                        : catalogMode
+                        ? "Registrar solicitud sin WhatsApp"
+                        : "Crear pedido sin WhatsApp"}
                     </Button>
                   </>
                 )}

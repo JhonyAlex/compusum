@@ -21,6 +21,7 @@ interface Brand {
   website: string | null;
   sortOrder: number;
   isActive: boolean;
+  catalogMode: boolean;
 }
 
 interface BrandFormProps {
@@ -39,6 +40,7 @@ export function BrandForm({ brand }: BrandFormProps) {
     website: brand?.website || "",
     sortOrder: brand?.sortOrder || 0,
     isActive: brand?.isActive ?? true,
+    catalogMode: brand?.catalogMode ?? false,
   });
 
   const generateSlug = (name: string) => {
@@ -206,6 +208,22 @@ export function BrandForm({ brand }: BrandFormProps) {
                   checked={formData.isActive}
                   onCheckedChange={(checked) =>
                     setFormData((prev) => ({ ...prev, isActive: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="catalogMode">Modo Catálogo</Label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Oculta precios en todos los productos de esta marca
+                  </p>
+                </div>
+                <Switch
+                  id="catalogMode"
+                  checked={formData.catalogMode}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({ ...prev, catalogMode: checked }))
                   }
                 />
               </div>

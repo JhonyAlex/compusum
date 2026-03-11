@@ -28,6 +28,7 @@ interface Category {
   icon: string | null;
   sortOrder: number;
   isActive: boolean;
+  catalogMode: boolean;
 }
 
 interface CategoryFormProps {
@@ -58,6 +59,7 @@ export function CategoryForm({ category, categories }: CategoryFormProps) {
     icon: category?.icon || "",
     sortOrder: category?.sortOrder || 0,
     isActive: category?.isActive ?? true,
+    catalogMode: category?.catalogMode ?? false,
   });
 
   const generateSlug = (name: string) => {
@@ -233,6 +235,22 @@ export function CategoryForm({ category, categories }: CategoryFormProps) {
                   checked={formData.isActive}
                   onCheckedChange={(checked) =>
                     setFormData((prev) => ({ ...prev, isActive: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="catalogMode">Modo Catálogo</Label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Oculta precios en todos los productos de esta categoría
+                  </p>
+                </div>
+                <Switch
+                  id="catalogMode"
+                  checked={formData.catalogMode}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({ ...prev, catalogMode: checked }))
                   }
                 />
               </div>

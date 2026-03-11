@@ -21,24 +21,35 @@ interface Product {
   stockStatus: string;
   isFeatured: boolean;
   isNew: boolean;
+  catalogMode?: boolean;
   brand?: {
     name: string;
     slug: string;
+    catalogMode?: boolean;
   } | null;
   category?: {
     name: string;
     slug: string;
+    catalogMode?: boolean;
   } | null;
 }
 
 interface ProductCardProps {
   product: Product;
   variant?: "default" | "compact";
+  globalCatalogMode?: boolean;
 }
 
-export function ProductCard({ product, variant = "default" }: ProductCardProps) {
+export function ProductCard({ product, variant = "default", globalCatalogMode = false }: ProductCardProps) {
   const whatsappMessage = `Hola, quiero cotizar: ${product.name}${product.sku ? ` (Ref: ${product.sku})` : ""}`;
   const whatsappUrl = `https://wa.me/576063335206?text=${encodeURIComponent(whatsappMessage)}`;
+
+  // Resolve catalog mode: product > category > brand > global
+  const isCatalogMode =
+    (product.catalogMode ?? false) ||
+    (product.category?.catalogMode ?? false) ||
+    (product.brand?.catalogMode ?? false) ||
+    globalCatalogMode;
 
   const stockStatusConfig = {
     disponible: { label: "Disponible", className: "bg-green-50 text-green-700 border-green-200" },
@@ -70,11 +81,15 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
                 {product.name}
               </h3>
             </Link>
-            {product.wholesalePrice && (
+            {isCatalogMode ? (
+              <p className="text-sm text-slate-500 mt-1 italic">
+                Cotizar precio
+              </p>
+            ) : product.wholesalePrice ? (
               <p className="text-blue-600 font-semibold text-sm mt-1">
                 {formatPrice(product.wholesalePrice)}
               </p>
-            )}
+            ) : null}
           </div>
         </div>
       </Card>
@@ -145,7 +160,11 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
 
         {/* Prices */}
         <div className="mt-3">
-          {product.wholesalePrice ? (
+          {isCatalogMode ? (
+            <p className="text-sm text-slate-500 italic">
+              Consultar precio
+            </p>
+          ) : product.wholesalePrice ? (
             <div>
               <p className="text-lg font-semibold text-blue-600">
                 {formatPrice(product.wholesalePrice)}
@@ -168,19 +187,22 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
 
         {/* CTA Buttons */}
         <div className="flex gap-2 mt-4">
-          <AddToCartButton
-            product={product as CartProduct}
-            variant="icon"
-            className="flex-1"
-          />
+          {!isCatalogMode && (
+            <AddToCartButton
+              product={product as CartProduct}
+              variant="icon"
+              className="flex-1"
+            />
+          )}
           <Button
             asChild
             size="sm"
             variant="outline"
-            className="border-green-200 text-green-700 hover:bg-green-50 gap-1 text-xs h-9 px-2.5"
+            className={`border-green-200 text-green-700 hover:bg-green-50 gap-1 text-xs h-9 px-2.5 ${isCatalogMode ? "flex-1" : ""}`}
           >
             <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
               <MessageCircle className="h-3.5 w-3.5" />
+              {isCatalogMode && <span>Cotizar</span>}
             </a>
           </Button>
         </div>

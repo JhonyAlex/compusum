@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { ProductDetailCTA } from "@/components/store/product-detail-cta";
 import { formatPrice } from "@/lib/format";
+import { resolveCatalogMode, isGlobalCatalogModeEnabled } from "@/lib/catalog-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,21 @@ export default async function ProductDetailPage({ params }: PageProps) {
   if (!product || !product.isActive) {
     notFound();
   }
+
+  // Resolve catalog mode for this product
+  let globalCatalogMode = false;
+  try {
+    globalCatalogMode = await isGlobalCatalogModeEnabled();
+  } catch (error) {
+    console.error("Catalog mode check failed", error);
+  }
+
+  const productCatalogMode = resolveCatalogMode(
+    product.catalogMode,
+    product.category?.catalogMode ?? false,
+    product.brand?.catalogMode,
+    globalCatalogMode
+  );
 
   // Get related products
   let relatedProducts: Awaited<ReturnType<typeof db.product.findMany<{ include: { brand: true; category: true } }>>> = [];
@@ -226,25 +242,38 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
                 {/* Prices */}
                 <div className="bg-[#F7EFEF] rounded-xl p-6">
-                  {product.price && (
-                    <p className="text-gray-500 line-through mb-1">
-                      Precio referencia: {formatPrice(product.price)}
-                    </p>
-                  )}
-                  {product.wholesalePrice && (
-                    <div className="flex items-baseline gap-3">
-                      <p className="text-3xl font-bold text-[#0D4DAA]">
-                        {formatPrice(product.wholesalePrice)}
+                  {productCatalogMode ? (
+                    <div>
+                      <p className="text-lg font-semibold text-[#0D4DAA]">
+                        Precio a consultar
                       </p>
-                      <Badge className="bg-[#E89A00] text-white">
-                        Precio mayorista
-                      </Badge>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Solicita tu cotización personalizada
+                      </p>
                     </div>
-                  )}
-                  {product.minWholesaleQty && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      Válido desde {product.minWholesaleQty} unidades
-                    </p>
+                  ) : (
+                    <>
+                      {product.price && (
+                        <p className="text-gray-500 line-through mb-1">
+                          Precio referencia: {formatPrice(product.price)}
+                        </p>
+                      )}
+                      {product.wholesalePrice && (
+                        <div className="flex items-baseline gap-3">
+                          <p className="text-3xl font-bold text-[#0D4DAA]">
+                            {formatPrice(product.wholesalePrice)}
+                          </p>
+                          <Badge className="bg-[#E89A00] text-white">
+                            Precio mayorista
+                          </Badge>
+                        </div>
+                      )}
+                      {product.minWholesaleQty && (
+                        <p className="text-sm text-gray-500 mt-2">
+                          Válido desde {product.minWholesaleQty} unidades
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -269,6 +298,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     brand: product.brand ? { name: product.brand.name, slug: product.brand.slug } : null,
                     category: product.category ? { name: product.category.name, slug: product.category.slug } : null,
                   }}
+                  catalogMode={productCatalogMode}
                 />
 
                 {/* Benefits */}
@@ -356,7 +386,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                 {relatedProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} />
+                  <ProductCard key={p.id} product={p} globalCatalogMode={globalCatalogMode} />
                 ))}
               </div>
             </div>
