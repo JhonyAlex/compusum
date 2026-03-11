@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   Store,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -27,6 +28,7 @@ const navigation = [
   { name: "Marcas", href: "/admin/marcas", icon: Tags },
   { name: "Carritos", href: "/admin/carritos", icon: ShoppingCart },
   { name: "Pedidos", href: "/admin/pedidos", icon: ClipboardList },
+  { name: "Importar CSV", href: "/admin/importar", icon: Upload },
   { name: "Páginas", href: "/admin/paginas", icon: FileText },
   { name: "Configuración", href: "/admin/configuracion", icon: Settings },
 ];
