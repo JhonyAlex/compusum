@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       isFeatured,
       isNew,
       isActive,
+      catalogMode,
       tags,
       sortOrder,
       images,
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
         isFeatured: isFeatured ?? false,
         isNew: isNew ?? false,
         isActive: isActive ?? true,
+        catalogMode: catalogMode ?? false,
         tags: tags || null,
         sortOrder: sortOrder || 0,
         // Create images if provided

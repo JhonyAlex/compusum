@@ -63,7 +63,7 @@ export async function PUT(request: Request, { params }: Props) {
 
     const { id } = await params;
     const body = await request.json();
-    const { name, slug, description, logo, website, sortOrder, isActive } = body;
+    const { name, slug, description, logo, website, sortOrder, isActive, catalogMode } = body;
 
     // Check if brand exists
     const existingBrand = await db.brand.findUnique({
@@ -101,6 +101,7 @@ export async function PUT(request: Request, { params }: Props) {
         website: website ?? null,
         sortOrder: sortOrder ?? existingBrand.sortOrder,
         isActive: isActive ?? existingBrand.isActive,
+        catalogMode: catalogMode ?? existingBrand.catalogMode,
       },
     });
 

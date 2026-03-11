@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, slug, description, image, icon, sortOrder, isActive } = body;
+    const { name, slug, description, image, icon, sortOrder, isActive, catalogMode } = body;
 
     if (!name || !slug) {
       return NextResponse.json(
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
         icon: icon || null,
         sortOrder: sortOrder || 0,
         isActive: isActive ?? true,
+        catalogMode: catalogMode ?? false,
       },
     });
 

@@ -51,6 +51,7 @@ interface Product {
   isFeatured: boolean;
   isNew: boolean;
   isActive: boolean;
+  catalogMode: boolean;
   tags: string | null;
   sortOrder: number;
   images: { id: string; imagePath: string; isPrimary: boolean }[];
@@ -93,6 +94,7 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
     isFeatured: product?.isFeatured ?? false,
     isNew: product?.isNew ?? false,
     isActive: product?.isActive ?? true,
+    catalogMode: product?.catalogMode ?? false,
     tags: product?.tags || "",
     sortOrder: product?.sortOrder || 0,
     images:
@@ -612,6 +614,22 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
                   checked={formData.isNew}
                   onCheckedChange={(checked) =>
                     setFormData((prev) => ({ ...prev, isNew: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="catalogMode">Modo Catálogo</Label>
+                  <p className="text-sm text-slate-500">
+                    Oculta el precio y deshabilita la compra para este producto
+                  </p>
+                </div>
+                <Switch
+                  id="catalogMode"
+                  checked={formData.catalogMode}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({ ...prev, catalogMode: checked }))
                   }
                 />
               </div>

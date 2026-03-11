@@ -24,6 +24,7 @@ import {
   Save,
   Store,
   Webhook,
+  BookOpen,
 } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
@@ -67,7 +68,7 @@ export default async function AdminConfigPage() {
 
       <div className="p-4 sm:p-6">
         <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="general">
               <Store className="h-4 w-4 mr-2" />
               General
@@ -83,6 +84,10 @@ export default async function AdminConfigPage() {
             <TabsTrigger value="seo">
               <Search className="h-4 w-4 mr-2" />
               SEO
+            </TabsTrigger>
+            <TabsTrigger value="catalog">
+              <BookOpen className="h-4 w-4 mr-2" />
+              Catálogo
             </TabsTrigger>
             <TabsTrigger value="integrations">
               <Webhook className="h-4 w-4 mr-2" />
@@ -484,6 +489,85 @@ export default async function AdminConfigPage() {
                     <p className="text-xs text-slate-400">
                       Body: {`{ "orderNumber": "CS-...", "status": "recibido" }`}
                     </p>
+                  </div>
+
+                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar configuración
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Catalog Mode Settings */}
+          <TabsContent value="catalog">
+            <Card>
+              <CardHeader>
+                <CardTitle>Modo Catálogo</CardTitle>
+                <CardDescription>
+                  Controla la visibilidad global de precios y la capacidad de compra en la tienda.
+                  También puedes activar el modo catálogo de forma individual por producto, categoría o marca.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={saveSettings} className="space-y-6">
+                  <input type="hidden" name="_group" value="catalog" />
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-1">
+                    <p className="text-sm font-medium text-amber-800">
+                      ¿Qué es el Modo Catálogo?
+                    </p>
+                    <p className="text-sm text-amber-700">
+                      Cuando está activo, los precios se ocultan en toda la tienda y el carrito
+                      se convierte en una lista de cotización. Los clientes pueden añadir
+                      productos y solicitar cotización sin ver precios.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
+                      Configuración global
+                    </h3>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="catalog_mode_enabled">Modo Catálogo global</Label>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Activa el modo catálogo para toda la tienda
+                        </p>
+                      </div>
+                      <Select
+                        name="catalog_mode_enabled"
+                        defaultValue={settingsMap.catalog_mode_enabled || "false"}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Activo</SelectItem>
+                          <SelectItem value="false">Inactivo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="catalog_mode_message">
+                        Mensaje de modo catálogo
+                      </Label>
+                      <Input
+                        id="catalog_mode_message"
+                        name="catalog_mode_message"
+                        defaultValue={
+                          settingsMap.catalog_mode_message ||
+                          "Solicita tu cotización personalizada"
+                        }
+                        placeholder="Solicita tu cotización personalizada"
+                      />
+                      <p className="text-xs text-slate-500">
+                        Texto que se muestra en lugar del precio cuando el modo catálogo está activo
+                      </p>
+                    </div>
                   </div>
 
                   <Button type="submit" className="bg-blue-600 hover:bg-blue-700">

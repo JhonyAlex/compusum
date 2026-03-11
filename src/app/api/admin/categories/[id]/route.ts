@@ -63,7 +63,7 @@ export async function PUT(request: Request, { params }: Props) {
 
     const { id } = await params;
     const body = await request.json();
-    const { name, slug, description, image, icon, sortOrder, isActive } = body;
+    const { name, slug, description, image, icon, sortOrder, isActive, catalogMode } = body;
 
     // Check if category exists
     const existingCategory = await db.category.findUnique({
@@ -101,6 +101,7 @@ export async function PUT(request: Request, { params }: Props) {
         icon: icon ?? null,
         sortOrder: sortOrder ?? existingCategory.sortOrder,
         isActive: isActive ?? existingCategory.isActive,
+        catalogMode: catalogMode ?? existingCategory.catalogMode,
       },
     });
 

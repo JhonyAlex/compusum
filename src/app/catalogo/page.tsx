@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
+import { isGlobalCatalogModeEnabled } from "@/lib/catalog-mode";
 import { 
   SlidersHorizontal, 
   X, 
@@ -44,6 +45,13 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   let brands: Awaited<ReturnType<typeof db.brand.findMany>> = [];
   let products: Awaited<ReturnType<typeof db.product.findMany>> = [];
   let totalProducts = 0;
+  let globalCatalogMode = false;
+
+  try {
+    globalCatalogMode = await isGlobalCatalogModeEnabled();
+  } catch (error) {
+    console.error("Catalog mode check failed:", error instanceof Error ? error.message : error);
+  }
 
   try {
     [categories, brands] = await Promise.all([
@@ -334,7 +342,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6">
                     {products.map((product) => (
-                      <ProductCard key={product.id} product={product} />
+                      <ProductCard key={product.id} product={product} globalCatalogMode={globalCatalogMode} />
                     ))}
                   </div>
 
