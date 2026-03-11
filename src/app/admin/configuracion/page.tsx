@@ -25,15 +25,26 @@ import {
   Store,
   Webhook,
   BookOpen,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { revalidatePath } from "next/cache";
 
-export default async function AdminConfigPage() {
+export default async function AdminConfigPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; saved?: string; error?: string }>;
+}) {
   const user = await getCurrentUser();
 
   if (!user) {
     redirect("/admin/login");
   }
+
+  const params = await searchParams;
+  const activeTab = params.tab || "general";
+  const saved = params.saved === "1";
+  const hasError = params.error === "1";
 
   // Get all settings
   const settings = await db.setting.findMany();
@@ -45,21 +56,30 @@ export default async function AdminConfigPage() {
   async function saveSettings(formData: FormData) {
     "use server";
 
-    const entries = Array.from(formData.entries());
-    
-    for (const [key, value] of entries) {
-      if (key === "_group") continue;
-      
-      const group = formData.get("_group") as string;
-      await db.setting.upsert({
-        where: { key },
-        update: { value: value as string },
-        create: { key, value: value as string, group, type: "text" },
-      });
+    const group = (formData.get("_group") as string) || "general";
+    let redirectPath = `/admin/configuracion?tab=${group}&error=1`;
+
+    try {
+      const entries = Array.from(formData.entries());
+
+      for (const [key, value] of entries) {
+        if (key === "_group") continue;
+
+        await db.setting.upsert({
+          where: { key },
+          update: { value: value as string },
+          create: { key, value: value as string, group, type: "text" },
+        });
+      }
+
+      revalidatePath("/admin/configuracion");
+      revalidatePath("/");
+      redirectPath = `/admin/configuracion?tab=${group}&saved=1`;
+    } catch (err) {
+      console.error("[saveSettings] Error guardando configuración:", err);
     }
 
-    revalidatePath("/admin/configuracion");
-    revalidatePath("/");
+    redirect(redirectPath);
   }
 
   return (
@@ -67,7 +87,20 @@ export default async function AdminConfigPage() {
       <Header title="Configuración" subtitle="Ajustes generales del sitio" />
 
       <div className="p-4 sm:p-6">
-        <Tabs defaultValue="general" className="space-y-6">
+        {saved && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            Configuración guardada correctamente.
+          </div>
+        )}
+        {hasError && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            Error al guardar la configuración. Revisa los logs del servidor.
+          </div>
+        )}
+
+        <Tabs defaultValue={activeTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="general">
               <Store className="h-4 w-4 mr-2" />
