@@ -50,7 +50,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   try {
     globalCatalogMode = await isGlobalCatalogModeEnabled();
   } catch (error) {
-    console.error("Catalog mode check failed", error);
+    console.error("Catalog mode check failed:", error instanceof Error ? error.message : error);
   }
 
   try {

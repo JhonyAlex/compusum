@@ -77,7 +77,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   try {
     globalCatalogMode = await isGlobalCatalogModeEnabled();
   } catch (error) {
-    console.error("Catalog mode check failed", error);
+    console.error("Catalog mode check failed:", error instanceof Error ? error.message : error);
   }
 
   const productCatalogMode = resolveCatalogMode(
