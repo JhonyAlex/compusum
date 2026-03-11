@@ -26,7 +26,7 @@ ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT=80
 ENV HOST=0.0.0.0
 
 # Copiamos la build standalone.
@@ -40,6 +40,6 @@ COPY --from=builder /app/prisma ./prisma
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
-EXPOSE 3000
+EXPOSE 80
 
 CMD ["./docker-entrypoint.sh"]
