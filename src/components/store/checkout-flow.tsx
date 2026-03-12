@@ -369,10 +369,14 @@ export function CheckoutFlow() {
                 {orderNumber ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                     <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                    <p className="text-lg font-bold text-green-800">Pedido creado</p>
+                    <p className="text-lg font-bold text-green-800">
+                      {catalogMode ? "Solicitud enviada" : "Pedido registrado"}
+                    </p>
                     <p className="text-sm text-green-700 font-mono">{orderNumber}</p>
                     <p className="text-xs text-green-600 mt-2">
-                      Tu pedido ha sido registrado. Te contactaremos pronto.
+                      {catalogMode
+                        ? "Recibimos tu solicitud. Te enviaremos la cotización pronto."
+                        : "Tu pedido está registrado. Te contactaremos para confirmar."}
                     </p>
                   </div>
                 ) : (
@@ -389,8 +393,8 @@ export function CheckoutFlow() {
                       {creatingOrder
                         ? "Procesando..."
                         : catalogMode
-                        ? "Enviar solicitud de cotización por WhatsApp"
-                        : "Enviar pedido por WhatsApp"}
+                        ? "Solicitar cotización por WhatsApp"
+                        : "Confirmar y enviar por WhatsApp"}
                     </Button>
 
                     <Button
@@ -401,10 +405,10 @@ export function CheckoutFlow() {
                     >
                       <Save className="h-4 w-4" />
                       {creatingOrder
-                        ? "Creando..."
+                        ? "Registrando..."
                         : catalogMode
-                        ? "Registrar solicitud sin WhatsApp"
-                        : "Crear pedido sin WhatsApp"}
+                        ? "Solo registrar solicitud"
+                        : "Confirmar sin WhatsApp"}
                     </Button>
                   </>
                 )}
@@ -417,7 +421,7 @@ export function CheckoutFlow() {
                     disabled={saving}
                   >
                     <Save className="h-4 w-4" />
-                    {saving ? "Guardando..." : "Solo guardar carrito"}
+                    {saving ? "Guardando..." : "Guardar para después"}
                   </Button>
                   <ShareCartMenu />
                 </div>

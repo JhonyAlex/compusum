@@ -53,7 +53,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const updated = await db.order.update({
       where: { id },
-      data: { status },
+      data: { 
+        status,
+        ...(body.notes !== undefined && { notes: body.notes }),
+      },
     });
 
     await db.orderStatusHistory.create({
