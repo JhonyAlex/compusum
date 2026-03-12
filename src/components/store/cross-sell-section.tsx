@@ -95,6 +95,7 @@ export function CrossSellSection() {
               size="icon"
               className="h-7 w-7 text-blue-600 hover:bg-blue-50"
               onClick={() => handleAdd(product)}
+              aria-label={`Agregar ${product.name} al carrito`}
             >
               <Plus className="h-4 w-4" />
             </Button>

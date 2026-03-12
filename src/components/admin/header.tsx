@@ -27,6 +27,7 @@ export function Header({ title, subtitle }: HeaderProps) {
             variant="ghost"
             size="icon"
             className="relative text-slate-500 hover:text-slate-700"
+            aria-label="Notificaciones"
           >
             <Bell className="h-5 w-5" />
           </Button>
