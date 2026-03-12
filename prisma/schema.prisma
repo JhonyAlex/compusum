@@ -14,12 +14,20 @@ datasource db {
 // USUARIOS ADMIN
 // =====================
 model User {
-  id        String    @id @default(cuid())
-  name      String
-  email     String    @unique
-  password  String    // Hash bcrypt
-  role      String    @default("editor") // admin, editor
-  isActive  Boolean   @default(true)
+  id       String  @id @default(cuid())
+  name     String
+  email    String? @unique
+  phone    String? @unique
+  password String // Hash bcrypt
+  role     String  @default("CUSTOMER") // admin, editor, AGENT, CUSTOMER
+  isActive Boolean @default(true)
+
+  assignedAgentId String?
+  assignedAgent   User?   @relation("AgentCustomers", fields: [assignedAgentId], references: [id])
+  customers       User[]  @relation("AgentCustomers")
+  managedOrders   Order[] @relation("AgentOrders")
+  orders          Order[] @relation("CustomerOrders")
+
   lastLogin DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -45,23 +53,23 @@ model Session {
 // CATEGORÍAS
 // =====================
 model Category {
-  id             String      @id @default(cuid())
-  name           String
-  slug           String      @unique
-  description    String?
-  image          String?
-  icon           String?     // Emoji o clase CSS
-  parentId       String?
-  parent         Category?   @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children       Category[]  @relation("CategoryTree")
-  sortOrder      Int         @default(0)
-  isActive       Boolean     @default(true)
-  catalogMode    Boolean     @default(false)
-  metaTitle      String?
+  id              String     @id @default(cuid())
+  name            String
+  slug            String     @unique
+  description     String?
+  image           String?
+  icon            String? // Emoji o clase CSS
+  parentId        String?
+  parent          Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children        Category[] @relation("CategoryTree")
+  sortOrder       Int        @default(0)
+  isActive        Boolean    @default(true)
+  catalogMode     Boolean    @default(false)
+  metaTitle       String?
   metaDescription String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  products       Product[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  products        Product[]
 }
 
 // =====================
@@ -104,34 +112,34 @@ model Season {
 // PRODUCTOS
 // =====================
 model Product {
-  id                String          @id @default(cuid())
-  name              String
-  slug              String          @unique
-  sku               String?         @unique
-  description       String?
-  shortDescription  String?
-  categoryId        String
-  category          Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  brandId           String?
-  brand             Brand?          @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  price             Float?
-  wholesalePrice    Float?
-  minWholesaleQty   Int             @default(1)
-  stockStatus       String          @default("disponible") // disponible, agotado, por_pedido
-  isFeatured        Boolean         @default(false)
-  isNew             Boolean         @default(false)
-  isActive          Boolean         @default(true)
-  catalogMode       Boolean         @default(false)
-  tags              String?
-  sortOrder         Int             @default(0)
-  viewsCount        Int             @default(0)
-  metaTitle         String?
-  metaDescription   String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  images            ProductImage[]
-  seasons           ProductSeason[]
-  cartItems         CartItem[]
+  id               String          @id @default(cuid())
+  name             String
+  slug             String          @unique
+  sku              String?         @unique
+  description      String?
+  shortDescription String?
+  categoryId       String
+  category         Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  brandId          String?
+  brand            Brand?          @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  price            Float?
+  wholesalePrice   Float?
+  minWholesaleQty  Int             @default(1)
+  stockStatus      String          @default("disponible") // disponible, agotado, por_pedido
+  isFeatured       Boolean         @default(false)
+  isNew            Boolean         @default(false)
+  isActive         Boolean         @default(true)
+  catalogMode      Boolean         @default(false)
+  tags             String?
+  sortOrder        Int             @default(0)
+  viewsCount       Int             @default(0)
+  metaTitle        String?
+  metaDescription  String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  images           ProductImage[]
+  seasons          ProductSeason[]
+  cartItems        CartItem[]
 }
 
 // =====================
@@ -165,20 +173,20 @@ model ProductSeason {
 // BANNERS
 // =====================
 model Banner {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   title        String
   subtitle     String?
   imageDesktop String
   imageMobile  String?
   linkUrl      String?
-  linkText     String   @default("Ver más")
-  position     String   @default("hero") // hero, promo, category, brand
-  isActive     Boolean  @default(true)
-  sortOrder    Int      @default(0)
+  linkText     String    @default("Ver más")
+  position     String    @default("hero") // hero, promo, category, brand
+  isActive     Boolean   @default(true)
+  sortOrder    Int       @default(0)
   startsAt     DateTime?
   endsAt       DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 // =====================
@@ -236,17 +244,21 @@ model City {
 // RUTAS DE ENVÍO
 // =====================
 model ShippingRoute {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   name             String
   estimatedDaysMin Int
   estimatedDaysMax Int
   shippingCompany  String?
   notes            String?
-  isActive         Boolean  @default(true)
-  sortOrder        Int      @default(0)
+  isActive         Boolean   @default(true)
+  capacity         Int?
+  cutOffTime       DateTime?
+  departureDate    DateTime?
+  sortOrder        Int       @default(0)
   cities           City[]
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  orders           Order[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 // =====================
@@ -298,22 +310,30 @@ model CartItem {
 // PEDIDOS
 // =====================
 model Order {
-  id              String               @id @default(cuid())
-  orderNumber     String               @unique
-  cartId          String
-  cart            Cart                 @relation(fields: [cartId], references: [id])
-  customerName    String
+  id          String @id @default(cuid())
+  orderNumber String @unique
+  cartId      String
+  cart        Cart   @relation(fields: [cartId], references: [id])
+
+  customerId String?
+  customer   User?   @relation("CustomerOrders", fields: [customerId], references: [id])
+  agentId    String?
+  agent      User?   @relation("AgentOrders", fields: [agentId], references: [id])
+
+  customerName    String?
   customerEmail   String?
   customerPhone   String?
   customerCompany String?
   cityId          String?
   city            City?                @relation(fields: [cityId], references: [id])
+  routeId         String?
+  route           ShippingRoute?       @relation(fields: [routeId], references: [id])
   notes           String?
   subtotal        Float
   status          String               @default("solicitado") // solicitado, compartido, recibido
   webhookSent     Boolean              @default(false)
   webhookResponse String?
-  sentVia         String?              // whatsapp, email, webhook
+  sentVia         String? // whatsapp, email, webhook
   items           OrderItem[]
   statusHistory   OrderStatusHistory[]
   createdAt       DateTime             @default(now())
