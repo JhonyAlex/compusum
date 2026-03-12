@@ -78,6 +78,52 @@ export async function POST(request: NextRequest) {
 
       const selectedRoute = await findBestRouteForCity(cityId || null, new Date(), tx);
 
+      // Check for an existing active order for this cart (upsert logic)
+      const existingOrder = await tx.order.findFirst({
+        where: { cartId },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (existingOrder) {
+        // Update the existing order instead of creating a duplicate
+        const updatedOrder = await tx.order.update({
+          where: { id: existingOrder.id },
+          data: {
+            customerId: customerResult.customer?.id || null,
+            agentId: customerResult.assignedAgentId || null,
+            customerName: safeName,
+            customerEmail: normalizedEmail,
+            customerPhone: normalizedPhone,
+            customerCompany: safeCompany,
+            cityId: cityId || null,
+            routeId: selectedRoute?.id || null,
+            notes: safeNotes,
+            subtotal,
+            sentVia: sentVia || null,
+            items: {
+              // Intentionally replace all items with the current cart snapshot
+              deleteMany: {},
+              create: cart.items.map((item) => ({
+                productId: item.productId,
+                productName: item.product.name,
+                productSku: item.product.sku,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice || item.product.wholesalePrice || item.product.price,
+              })),
+            },
+          },
+          include: { items: true },
+        });
+
+        // Keep cart status as convertido
+        await tx.cart.update({
+          where: { id: cartId },
+          data: { status: "convertido" },
+        });
+
+        return updatedOrder;
+      }
+
       // Generate order number: CS-YYYYMMDD-XXXX (inside transaction for atomicity)
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       const countToday = await tx.order.count({

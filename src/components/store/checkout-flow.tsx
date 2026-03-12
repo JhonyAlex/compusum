@@ -72,23 +72,33 @@ export function CheckoutFlow() {
   const handleSaveCart = async () => {
     setSaving(true);
     try {
-      const response = await fetch("/api/carts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((item) => ({
-            productId: item.product.id,
-            quantity: item.quantity,
-            unitPrice: item.product.wholesalePrice || item.product.price,
-          })),
-          customerName: customerInfo.name || null,
-          customerEmail: customerInfo.email || null,
-          customerPhone: customerInfo.phone || null,
-          customerCompany: customerInfo.company || null,
-          cityId: customerInfo.cityId || null,
-          notes: customerInfo.notes || null,
-        }),
-      });
+      const cartPayload = {
+        items: items.map((item) => ({
+          productId: item.product.id,
+          quantity: item.quantity,
+          unitPrice: item.product.wholesalePrice || item.product.price,
+        })),
+        customerName: customerInfo.name || null,
+        customerEmail: customerInfo.email || null,
+        customerPhone: customerInfo.phone || null,
+        customerCompany: customerInfo.company || null,
+        cityId: customerInfo.cityId || null,
+        notes: customerInfo.notes || null,
+      };
+
+      const existingUuid = useCartStore.getState().savedCartUuid;
+      const response = existingUuid
+        ? await fetch(`/api/carts/${existingUuid}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(cartPayload),
+          })
+        : await fetch("/api/carts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(cartPayload),
+          });
+
       const data = await response.json();
       if (data.success) {
         setSavedCartUuid(data.data.uuid);
@@ -96,6 +106,11 @@ export function CheckoutFlow() {
           description: "Puedes compartir el enlace para que otros lo vean",
         });
       } else {
+        // Clear the stale UUID only when the cart is no longer modifiable (e.g. already converted),
+        // so the next save attempt creates a fresh cart. Transient errors preserve the UUID for retry.
+        if (existingUuid && response.status === 403) {
+          setSavedCartUuid(null);
+        }
         toast.error("Error al guardar el carrito");
       }
     } catch {
