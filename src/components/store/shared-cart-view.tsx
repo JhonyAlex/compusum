@@ -249,7 +249,7 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
       {/* Actions */}
       <div className="space-y-3">
         <p className="text-sm text-slate-600 text-center">
-          Puedes continuar con la cotización, enviar por WhatsApp o ver más productos para completar tu pedido.
+          Continua por WhatsApp o agrega más productos.
         </p>
 
         <Button

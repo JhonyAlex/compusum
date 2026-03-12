@@ -128,6 +128,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
           <OrderAdminActions
             orderId={order.id}
             currentStatus={order.status}
+            currentNotes={order.notes || ""}
             webhookSent={order.webhookSent}
           />
         </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import {
   Tooltip,
@@ -8,10 +9,23 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+const DEFAULT_PHONE = "576063335206";
+const DEFAULT_MESSAGE = "Hola, quiero información sobre precios mayoristas";
+
 export function WhatsAppButton() {
-  const phoneNumber = "576063335206";
-  const message = "Hola, quiero información sobre precios mayoristas";
-  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+  const [phoneNumber, setPhoneNumber] = useState(DEFAULT_PHONE);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        const phone = data?.data?.contact?.whatsapp_global?.value;
+        if (phone) setPhoneNumber(phone);
+      })
+      .catch(() => {});
+  }, []);
+
+  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(DEFAULT_MESSAGE)}`;
 
   return (
     <TooltipProvider>
