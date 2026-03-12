@@ -27,7 +27,7 @@ ENV DATABASE_URL=$DATABASE_URL
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=80
-ENV HOST=0.0.0.0
+ENV HOSTNAME=0.0.0.0
 
 # Copiamos la build standalone.
 # El script build de tu package.json ya se encarga de meter 'public' y '.next/static' aquí.
