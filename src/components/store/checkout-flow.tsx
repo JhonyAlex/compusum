@@ -237,14 +237,9 @@ export function CheckoutFlow() {
                 ))}
               </div>
               <Separator className="my-4" />
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-blue-800">
-                  Puedes continuar con tu cotización, enviar por WhatsApp o volver al catálogo para agregar más productos.
-                </p>
-              </div>
               {catalogMode ? (
-                <p className="text-sm text-slate-500 italic">
-                  Los precios serán cotizados de forma personalizada
+                <p className="text-sm text-slate-500">
+                  Precios por cotización.
                 </p>
               ) : (
                 <>
