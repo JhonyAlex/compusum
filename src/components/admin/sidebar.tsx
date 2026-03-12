@@ -84,6 +84,7 @@ export function Sidebar({ user }: SidebarProps) {
           size="icon"
           onClick={() => setMobileOpen(!mobileOpen)}
           className="bg-white shadow-sm"
+          aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>

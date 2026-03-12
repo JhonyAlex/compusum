@@ -52,15 +52,17 @@ export function AddToCartButton({ product, variant = "icon", className }: AddToC
             size="icon"
             className="h-9 w-9 rounded-r-none"
             onClick={() => setQuantity(Math.max(1, quantity - 1))}
+            aria-label={`Disminuir cantidad de ${product.name}`}
           >
             <Minus className="h-4 w-4" />
           </Button>
-          <span className="w-12 text-center text-sm font-medium">{quantity}</span>
+          <span className="w-12 text-center text-sm font-medium" aria-label={`Cantidad actual: ${quantity}`}>{quantity}</span>
           <Button
             variant="ghost"
             size="icon"
             className="h-9 w-9 rounded-l-none"
             onClick={() => setQuantity(quantity + 1)}
+            aria-label={`Aumentar cantidad de ${product.name}`}
           >
             <Plus className="h-4 w-4" />
           </Button>
