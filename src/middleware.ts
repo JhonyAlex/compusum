@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { randomUUID } from "crypto";
 
 // Routes that don't require authentication
 const publicRoutes = ["/admin/login"];
@@ -10,20 +11,37 @@ export async function middleware(request: NextRequest) {
   // Check for catalog mode on API catalog endpoints
   if (pathname.startsWith("/api/catalog/products")) {
     const response = NextResponse.next();
-    // We add a custom header to indicate this is a catalog request.
-    // Further scrubbing is done at the route handler level (src/app/api/catalog/products/route.ts).
     response.headers.set("x-middleware-catalog", "true");
     return response;
   }
 
-  // Only handle /admin routes
+  // Generar o mantener sessionId para usuarios no autenticados
+  // Esta es la sesión del navegador para rastrear carritos/órdenes de invitados
+  let response = NextResponse.next();
+  
+  let sessionId = request.cookies.get("x-session-id")?.value;
+  if (!sessionId) {
+    sessionId = randomUUID();
+    response.cookies.set("x-session-id", sessionId, {
+      httpOnly: false, // Accesible desde cliente para APIs
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60, // 7 días
+      path: "/",
+    });
+  }
+
+  // Pasar sessionId como header a los route handlers
+  response.headers.set("x-session-id", sessionId);
+
+  // Only handle /admin routes further
   if (!pathname.startsWith("/admin")) {
-    return NextResponse.next();
+    return response;
   }
 
   // Allow public routes
   if (publicRoutes.some((route) => pathname.startsWith(route))) {
-    return NextResponse.next();
+    return response;
   }
 
   // Check for session token cookie
@@ -34,13 +52,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // We decode the token or fetch the user's role to restrict AGENT access to specific routes if necessary
-  // To implement RBAC here, we'd ideally decode a JWT, but since this project uses a DB-backed session token,
-  // RBAC for the agent panel is better handled inside the API routes themselves or with a custom auth hook.
-
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/catalog/products"],
+  matcher: ["/admin/:path*", "/api/catalog/products", "/api/:path*"],
 };

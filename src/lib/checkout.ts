@@ -164,3 +164,25 @@ export async function processCheckout(checkoutData: any) {
 function calculateTotal(items: any[]) {
     return items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 }
+
+/**
+ * Transferir carritos y órdenes de sesión a usuario cuando inicia sesión registrado
+ * Llamar esto después de autenticar un usuario con sessionId
+ */
+export async function transferSessionDataToUser(sessionId: string, userId: string) {
+  const { transferSessionCartToUser } = await import('./order-cart-upsert');
+  const { transferSessionOrderToUser } = await import('./order-cart-upsert');
+
+  return db.$transaction(async (tx) => {
+    // Transferir carrito
+    const transferredCart = await transferSessionCartToUser(sessionId, userId);
+
+    // Transferir orden(es)
+    const transferredOrders = await transferSessionOrderToUser(sessionId, userId);
+
+    return {
+      cart: transferredCart,
+      orders: transferredOrders,
+    };
+  });
+}

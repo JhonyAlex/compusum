@@ -267,6 +267,8 @@ model ShippingRoute {
 model Cart {
   id              String     @id @default(cuid())
   uuid            String     @unique @default(uuid())
+  sessionId       String?    // Session ID del navegador para usuarios invitados
+  userId          String?    // User ID para usuarios logueados
   customerName    String?
   customerEmail   String?
   customerPhone   String?
@@ -283,8 +285,11 @@ model Cart {
   updatedAt       DateTime   @updatedAt
   expiresAt       DateTime?
 
+  @@unique([sessionId, status]) // Garantiza un único carrito activo por sesión
   @@index([uuid])
   @@index([status])
+  @@index([sessionId])
+  @@index([userId])
   @@index([customerEmail])
 }
 
@@ -320,6 +325,7 @@ model Order {
   agentId    String?
   agent      User?   @relation("AgentOrders", fields: [agentId], references: [id])
 
+  sessionId       String? // Session ID para rastreo de usuarios invitados
   customerName    String?
   customerEmail   String?
   customerPhone   String?
@@ -339,9 +345,13 @@ model Order {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
+  @@unique([sessionId, status]) // Garantiza un único pedido activo por sesión para usuarios invitados
+  @@unique([customerId, status]) // Garantiza un único pedido activo por usuario logueado
   @@index([status])
   @@index([orderNumber])
   @@index([cartId])
+  @@index([sessionId])
+  @@index([customerId])
   @@index([cityId])
 }
 
