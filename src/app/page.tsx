@@ -308,11 +308,11 @@ export default async function HomePage() {
             </div>
 
             {/* View All CTA */}
-            <div className="text-center mt-10">
-              <Button asChild variant="outline" size="lg" className="border-slate-300 text-slate-700 hover:bg-slate-50">
+            <div className="text-center mt-10 sm:mt-12">
+              <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700 text-white gap-2 px-6 sm:px-8">
                 <Link href="/catalogo">
                   Ver catálogo completo
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
             </div>
