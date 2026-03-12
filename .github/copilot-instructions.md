@@ -33,12 +33,13 @@ No cierres un cambio grande solo porque compila o porque existe una migracion. H
 Cuando el cambio toque Prisma, seed, bootstrap o flujos que dependen de columnas nuevas, el agente NO debe ejecutar deploy directamente. Debe seguir este orden para evitar incidentes:
 
 1. Verificar que toda migracion nueva sea idempotente (`IF NOT EXISTS` en columnas e indices).
-2. Ejecutar `bunx prisma generate`.
-3. Ejecutar `bunx prisma migrate status` para detectar estado inconsistente antes de desplegar.
-4. Si hay migracion fallida (`P3009`), resolver primero con `bunx prisma migrate resolve --rolled-back <nombre>` y solo despues reintentar `bunx prisma migrate deploy`.
-5. Ejecutar `bunx prisma migrate deploy`.
-6. Ejecutar `bun run seed`.
-7. Ejecutar `bun run build` si se tocaron rutas/API/componentes/flujo de app.
+2. Si la migracion crea indices o constraints unicos sobre tablas con datos existentes, incluir en la misma migracion una fase previa de deduplicacion/normalizacion de datos para evitar `P3018` (`23505`).
+3. Ejecutar `bunx prisma generate`.
+4. Ejecutar `bunx prisma migrate status` para detectar estado inconsistente antes de desplegar.
+5. Si hay migracion fallida (`P3009`), resolver primero con `bunx prisma migrate resolve --rolled-back <nombre>` y solo despues reintentar `bunx prisma migrate deploy`.
+6. Ejecutar `bunx prisma migrate deploy`.
+7. Ejecutar `bun run seed`.
+8. Ejecutar `bun run build` si se tocaron rutas/API/componentes/flujo de app.
 
 Si cualquiera de estos pasos falla, se corrige la causa raiz antes de continuar. No se permite "seguir para ver si arranca" ni reinicios ciegos del contenedor.
 
