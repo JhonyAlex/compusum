@@ -26,7 +26,7 @@ export function CartSheet() {
   const itemCount = useCartStore(getItemCount);
   const subtotal = useCartStore(getSubtotal);
 
-  // Hydration fix for Zustand persist
+  // Prevent hydration mismatch for Zustand persist
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
