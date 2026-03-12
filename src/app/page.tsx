@@ -218,7 +218,7 @@ export default async function HomePage() {
                   asChild
                   variant="outline"
                   size="lg"
-                  className="border-slate-500 text-slate-200 hover:bg-slate-700 hover:text-white"
+                  className="border-slate-500 bg-transparent text-slate-200 hover:bg-slate-700 hover:text-white"
                 >
                   <Link href="/catalogo">
                     Ver catálogo

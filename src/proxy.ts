@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { randomUUID } from "crypto";
 
 // Routes that don't require authentication
 const publicRoutes = ["/admin/login"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Check for catalog mode on API catalog endpoints
@@ -18,10 +17,10 @@ export async function middleware(request: NextRequest) {
   // Generar o mantener sessionId para usuarios no autenticados
   // Esta es la sesión del navegador para rastrear carritos/órdenes de invitados
   let response = NextResponse.next();
-  
+
   let sessionId = request.cookies.get("x-session-id")?.value;
   if (!sessionId) {
-    sessionId = randomUUID();
+    sessionId = globalThis.crypto.randomUUID();
     response.cookies.set("x-session-id", sessionId, {
       httpOnly: false, // Accesible desde cliente para APIs
       secure: process.env.NODE_ENV === "production",
