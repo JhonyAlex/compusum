@@ -1,0 +1,1 @@
+-- CreateIndex CREATE UNIQUE INDEX "Cart_sessionId_status_key" ON "Cart"("sessionId", "status");  -- CreateIndex CREATE UNIQUE INDEX "Order_sessionId_status_key" ON "Order"("sessionId", "status");  -- CreateIndex CREATE UNIQUE INDEX "Order_customerId_status_key" ON "Order"("customerId", "status"); 
