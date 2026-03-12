@@ -78,7 +78,7 @@ export default async function AdminClientesPage({ searchParams }: Props) {
     const key =
       order.customerEmail?.toLowerCase() ||
       order.customerPhone ||
-      `nocontact-${order.customerName}`;
+      `nocontact-${order.customerName || order.id}`;
 
     if (customerMap.has(key)) {
       const existing = customerMap.get(key)!;

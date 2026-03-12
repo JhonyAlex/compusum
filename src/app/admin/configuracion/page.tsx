@@ -535,81 +535,128 @@ export default async function AdminConfigPage({
 
           {/* Catalog Mode Settings */}
           <TabsContent value="catalog">
-            <Card>
-              <CardHeader>
-                <CardTitle>Modo Catálogo</CardTitle>
-                <CardDescription>
-                  Controla la visibilidad global de precios y la capacidad de compra en la tienda.
-                  También puedes activar el modo catálogo de forma individual por producto, categoría o marca.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form action={saveSettings} className="space-y-6">
-                  <input type="hidden" name="_group" value="catalog" />
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Modo Catálogo</CardTitle>
+                  <CardDescription>
+                    Controla la visibilidad global de precios y la capacidad de compra en la tienda.
+                    También puedes activar el modo catálogo de forma individual por producto, categoría o marca.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form action={saveSettings} className="space-y-6">
+                    <input type="hidden" name="_group" value="catalog" />
 
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-1">
-                    <p className="text-sm font-medium text-amber-800">
-                      ¿Qué es el Modo Catálogo?
-                    </p>
-                    <p className="text-sm text-amber-700">
-                      Cuando está activo, los precios se ocultan en toda la tienda y el carrito
-                      se convierte en una lista de cotización. Los clientes pueden añadir
-                      productos y solicitar cotización sin ver precios.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
-                      Configuración global
-                    </h3>
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="catalog_mode_enabled">Modo Catálogo global</Label>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Activa el modo catálogo para toda la tienda
-                        </p>
-                      </div>
-                      <Select
-                        name="catalog_mode_enabled"
-                        defaultValue={settingsMap.catalog_mode_enabled || "false"}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="true">Activo</SelectItem>
-                          <SelectItem value="false">Inactivo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="catalog_mode_message">
-                        Mensaje de modo catálogo
-                      </Label>
-                      <Input
-                        id="catalog_mode_message"
-                        name="catalog_mode_message"
-                        defaultValue={
-                          settingsMap.catalog_mode_message ||
-                          "Solicita tu cotización personalizada"
-                        }
-                        placeholder="Solicita tu cotización personalizada"
-                      />
-                      <p className="text-xs text-slate-500">
-                        Texto que se muestra en lugar del precio cuando el modo catálogo está activo
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-1">
+                      <p className="text-sm font-medium text-amber-800">
+                        ¿Qué es el Modo Catálogo?
+                      </p>
+                      <p className="text-sm text-amber-700">
+                        Cuando está activo, los precios se ocultan en toda la tienda y el carrito
+                        se convierte en una lista de cotización. Los clientes pueden añadir
+                        productos y solicitar cotización sin ver precios.
                       </p>
                     </div>
-                  </div>
 
-                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar configuración
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
+                        Configuración global
+                      </h3>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="catalog_mode_enabled">Modo Catálogo global</Label>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Activa el modo catálogo para toda la tienda
+                          </p>
+                        </div>
+                        <Select
+                          name="catalog_mode_enabled"
+                          defaultValue={settingsMap.catalog_mode_enabled || "false"}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="true">Activo</SelectItem>
+                            <SelectItem value="false">Inactivo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="catalog_mode_message">
+                          Mensaje de modo catálogo
+                        </Label>
+                        <Input
+                          id="catalog_mode_message"
+                          name="catalog_mode_message"
+                          defaultValue={
+                            settingsMap.catalog_mode_message ||
+                            "Solicita tu cotización personalizada"
+                          }
+                          placeholder="Solicita tu cotización personalizada"
+                        />
+                        <p className="text-xs text-slate-500">
+                          Texto que se muestra en lugar del precio cuando el modo catálogo está activo
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label htmlFor="cross_sell_enabled">Sugerencias en carrito (Cross-sell)</Label>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Muestra productos relacionados automáticamente en el carrito y en el estado vacío
+                          </p>
+                        </div>
+                        <Select
+                          name="cross_sell_enabled"
+                          defaultValue={settingsMap.cross_sell_enabled || "true"}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="true">Activo</SelectItem>
+                            <SelectItem value="false">Inactivo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                      <Save className="h-4 w-4 mr-2" />
+                      Guardar configuración
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">¿Cómo funciona el cross-sell?</CardTitle>
+                  <CardDescription>
+                    Las sugerencias de productos se generan automáticamente
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm text-slate-600 space-y-2">
+                  <p>
+                    • <strong>Carrito con productos:</strong> Muestra hasta 3 productos de la misma categoría que el primer ítem en el carrito, excluyendo los ya agregados.
+                  </p>
+                  <p>
+                    • <strong>Carrito vacío:</strong> Muestra hasta 4 productos destacados para inspirar al comprador.
+                  </p>
+                  <p>
+                    • Para marcar un producto como destacado, edítalo en{" "}
+                    <a href="/admin/productos" className="text-blue-600 hover:underline">
+                      Productos
+                    </a>{" "}
+                    y activa la opción <strong>Destacado</strong>.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

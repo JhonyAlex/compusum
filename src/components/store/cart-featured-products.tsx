@@ -29,8 +29,9 @@ export function CartFeaturedProducts() {
   const { catalogMode } = useCatalogMode();
   const [products, setProducts] = useState<FeaturedProduct[]>([]);
   const [loading, setLoading] = useState(false);
+  const [enabled, setEnabled] = useState(true);
 
-  useEffect(() => {
+  const fetchFeaturedProducts = () => {
     setLoading(true);
     fetch("/api/products?featured=true&limit=6")
       .then((r) => r.json())
@@ -41,9 +42,27 @@ export function CartFeaturedProducts() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        const crossSellEnabled = data?.data?.catalog?.cross_sell_enabled?.value;
+        if (crossSellEnabled === false) {
+          setEnabled(false);
+          return;
+        }
+        fetchFeaturedProducts();
+      })
+      .catch(() => {
+        // Fallback: load featured products when settings fetch fails
+        fetchFeaturedProducts();
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading || products.length === 0) return null;
+  if (!enabled || loading || products.length === 0) return null;
 
   const handleAdd = (product: FeaturedProduct) => {
     addItem(product as CartProduct, 1);

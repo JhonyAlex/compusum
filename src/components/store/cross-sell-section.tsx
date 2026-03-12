@@ -29,9 +29,21 @@ export function CrossSellSection() {
   const { catalogMode } = useCatalogMode();
   const [suggestions, setSuggestions] = useState<CrossSellProduct[]>([]);
   const [loading, setLoading] = useState(false);
+  const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
-    if (items.length === 0) {
+    // Check if cross-sell is enabled via settings
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        const crossSellEnabled = data?.data?.catalog?.cross_sell_enabled?.value;
+        if (crossSellEnabled === false) setEnabled(false);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || items.length === 0) {
       setSuggestions([]);
       return;
     }
@@ -54,7 +66,7 @@ export function CrossSellSection() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [items]);
+  }, [items, enabled]);
 
   if (suggestions.length === 0 || loading) return null;
 
