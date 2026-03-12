@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { useCartStore, getItemCount, getSubtotal } from "@/stores/cart-store";
 import { CartItemRow } from "@/components/store/cart-item-row";
 import { CrossSellSection } from "@/components/store/cross-sell-section";
+import { CartFeaturedProducts } from "@/components/store/cart-featured-products";
 import { ShareCartMenu } from "@/components/store/share-cart-menu";
 import { formatPrice } from "@/lib/format";
 import Link from "next/link";
@@ -64,26 +65,32 @@ export function CartSheet() {
 
         {items.length === 0 ? (
           /* Empty state */
-          <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-              <ShoppingCart className="h-8 w-8 text-slate-400" />
+          <ScrollArea className="flex-1">
+            <div className="flex flex-col items-center justify-center px-6 pt-8 pb-4 text-center">
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                <ShoppingCart className="h-8 w-8 text-slate-400" />
+              </div>
+              <p className="text-lg font-medium text-slate-700 mb-1">
+                Tu carrito está vacío
+              </p>
+              <p className="text-sm text-slate-400 mb-6">
+                Agrega productos desde el catálogo para comenzar tu pedido
+              </p>
+              <Button
+                asChild
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => setOpen(false)}
+              >
+                <Link href="/catalogo">
+                  Ver catálogo
+                </Link>
+              </Button>
             </div>
-            <p className="text-lg font-medium text-slate-700 mb-1">
-              Tu carrito está vacío
-            </p>
-            <p className="text-sm text-slate-400 mb-6">
-              Agrega productos desde el catálogo para comenzar tu pedido
-            </p>
-            <Button
-              asChild
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => setOpen(false)}
-            >
-              <Link href="/catalogo">
-                Ver catálogo
-              </Link>
-            </Button>
-          </div>
+            {/* Featured products in empty cart */}
+            <div className="px-4 pb-6">
+              <CartFeaturedProducts />
+            </div>
+          </ScrollArea>
         ) : (
           <>
             {/* Items list */}
@@ -110,13 +117,10 @@ export function CartSheet() {
                 )}
               </div>
               {catalogMode ? (
-                <p className="text-[11px] text-slate-400">Los precios se comparten por cotización.</p>
+                <p className="text-[11px] text-slate-400">Precios por cotización.</p>
               ) : (
                 <p className="text-[11px] text-slate-400">Precios sujetos a confirmación. Envío no incluido.</p>
               )}
-              <p className="text-[11px] text-slate-500">
-                Puedes seguir cotizando, enviar por WhatsApp o ver más productos cuando quieras.
-              </p>
 
               <Separator />
 

@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { Header } from "@/components/store/header";
 import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
+import { HeroSearchBar } from "@/components/store/hero-search-bar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -187,8 +188,11 @@ export default async function HomePage() {
                 Distribuimos papelería escolar, de oficina y arte a negocios, instituciones y empresas en todo el Eje Cafetero y Norte del Valle.
               </p>
               
+              {/* Search Bar */}
+              <HeroSearchBar />
+
               {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-8 sm:mb-12">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mt-6 mb-8 sm:mb-12">
                 <Button 
                   asChild 
                   size="lg" 
@@ -209,6 +213,16 @@ export default async function HomePage() {
                     <MessageCircle className="h-4 w-4" />
                     Hablar con un asesor
                   </a>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="border-slate-500 text-slate-200 hover:bg-slate-700 hover:text-white"
+                >
+                  <Link href="/catalogo">
+                    Ver catálogo
+                  </Link>
                 </Button>
               </div>
               

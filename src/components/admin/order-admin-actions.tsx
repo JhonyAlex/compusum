@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Send, Webhook } from "lucide-react";
+import { Send, Webhook, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,12 +19,15 @@ import { toast } from "sonner";
 interface OrderAdminActionsProps {
   orderId: string;
   currentStatus: string;
+  currentNotes?: string;
   webhookSent: boolean;
 }
 
-export function OrderAdminActions({ orderId, currentStatus, webhookSent }: OrderAdminActionsProps) {
+export function OrderAdminActions({ orderId, currentStatus, currentNotes = "", webhookSent }: OrderAdminActionsProps) {
   const [status, setStatus] = useState(currentStatus);
+  const [notes, setNotes] = useState(currentNotes);
   const [loading, setLoading] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
   const [webhookLoading, setWebhookLoading] = useState(false);
   const router = useRouter();
 
@@ -46,6 +51,28 @@ export function OrderAdminActions({ orderId, currentStatus, webhookSent }: Order
       toast.error("Error de conexión");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, notes }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Notas guardadas");
+        router.refresh();
+      } else {
+        toast.error(data.error || "Error al guardar notas");
+      }
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setSavingNotes(false);
     }
   };
 
@@ -87,6 +114,30 @@ export function OrderAdminActions({ orderId, currentStatus, webhookSent }: Order
               <SelectItem value="recibido">Recibido</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="order-notes" className="text-sm text-slate-600 mb-1.5 block">
+            Notas internas
+          </Label>
+          <Textarea
+            id="order-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Agregar notas sobre este pedido..."
+            rows={3}
+            className="text-sm"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2 gap-2 w-full"
+            onClick={handleSaveNotes}
+            disabled={savingNotes}
+          >
+            <Save className="h-3.5 w-3.5" />
+            {savingNotes ? "Guardando..." : "Guardar notas"}
+          </Button>
         </div>
 
         <Button
