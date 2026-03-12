@@ -110,10 +110,13 @@ export function CartSheet() {
                 )}
               </div>
               {catalogMode ? (
-                <p className="text-[11px] text-slate-400">Modo catálogo activo. Los precios se comparten por cotización.</p>
+                <p className="text-[11px] text-slate-400">Los precios se comparten por cotización.</p>
               ) : (
                 <p className="text-[11px] text-slate-400">Precios sujetos a confirmación. Envío no incluido.</p>
               )}
+              <p className="text-[11px] text-slate-500">
+                Puedes seguir cotizando, enviar por WhatsApp o ver más productos cuando quieras.
+              </p>
 
               <Separator />
 
@@ -131,6 +134,17 @@ export function CartSheet() {
                 </Button>
 
                 <CartWhatsAppButton />
+
+                <Button
+                  asChild
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setOpen(false)}
+                >
+                  <Link href="/catalogo">
+                    Ver más productos
+                  </Link>
+                </Button>
 
                 <div className="flex gap-2">
                   <ShareCartMenu />

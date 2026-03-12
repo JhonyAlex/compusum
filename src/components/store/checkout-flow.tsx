@@ -24,6 +24,7 @@ import { CitySelector } from "@/components/store/city-selector";
 import { ShareCartMenu } from "@/components/store/share-cart-menu";
 import { formatPrice } from "@/lib/format";
 import { toast } from "sonner";
+import Link from "next/link";
 
 const STEPS = [
   { id: "resumen", label: "Resumen", icon: ShoppingCart },
@@ -225,7 +226,7 @@ export function CheckoutFlow() {
               {catalogMode && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
                   <p className="text-sm text-amber-800">
-                    📋 <strong>Modo Catálogo:</strong> Los precios serán cotizados personalmente.
+                    📋 Los precios serán cotizados personalmente.
                     Completa tus datos para recibir la cotización.
                   </p>
                 </div>
@@ -236,6 +237,11 @@ export function CheckoutFlow() {
                 ))}
               </div>
               <Separator className="my-4" />
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  Puedes continuar con tu cotización, enviar por WhatsApp o volver al catálogo para agregar más productos.
+                </p>
+              </div>
               {catalogMode ? (
                 <p className="text-sm text-slate-500 italic">
                   Los precios serán cotizados de forma personalizada
@@ -452,6 +458,11 @@ export function CheckoutFlow() {
             <ArrowRight className="h-4 w-4" />
           </Button>
         )}
+      </div>
+      <div className="mt-3">
+        <Button asChild variant="outline" className="w-full sm:w-auto">
+          <Link href="/catalogo">Ver más productos</Link>
+        </Button>
       </div>
     </div>
   );

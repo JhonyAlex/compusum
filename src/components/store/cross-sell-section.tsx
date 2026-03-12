@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCatalogMode } from "@/hooks/use-catalog-mode";
 import { useCartStore, type CartProduct } from "@/stores/cart-store";
 import { formatPrice } from "@/lib/format";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ interface CrossSellProduct {
 export function CrossSellSection() {
   const items = useCartStore((s) => s.items);
   const addItem = useCartStore((s) => s.addItem);
+  const { catalogMode } = useCatalogMode();
   const [suggestions, setSuggestions] = useState<CrossSellProduct[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -86,9 +88,13 @@ export function CrossSellSection() {
               >
                 {product.name}
               </Link>
-              <p className="text-xs font-medium text-blue-600">
-                {formatPrice(product.wholesalePrice || product.price)}
-              </p>
+              {catalogMode ? (
+                <p className="text-xs font-medium text-slate-500 italic">Consultar precio</p>
+              ) : (
+                <p className="text-xs font-medium text-blue-600">
+                  {formatPrice(product.wholesalePrice || product.price)}
+                </p>
+              )}
             </div>
             <Button
               variant="ghost"

@@ -233,7 +233,7 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
             )}
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            {catalogMode ? 'Modo catálogo activo. Los precios se comparten por cotización.' : 'Precios sujetos a confirmación'}
+            {catalogMode ? 'Los precios se comparten por cotización.' : 'Precios sujetos a confirmación'}
           </p>
           {cart.notes && (
             <>
@@ -248,6 +248,10 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
 
       {/* Actions */}
       <div className="space-y-3">
+        <p className="text-sm text-slate-600 text-center">
+          Puedes continuar con la cotización, enviar por WhatsApp o ver más productos para completar tu pedido.
+        </p>
+
         <Button
           onClick={handleLoadToMyCart}
           className="w-full bg-blue-600 hover:bg-blue-700 gap-2 h-12"
@@ -274,6 +278,10 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? "Copiado" : "Copiar enlace"}
+        </Button>
+
+        <Button asChild variant="outline" className="w-full">
+          <Link href="/catalogo">Ver más productos</Link>
         </Button>
       </div>
     </div>

@@ -187,18 +187,16 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
 
         {/* CTA Buttons */}
         <div className="flex gap-2 mt-4">
-          {!isCatalogMode && (
-            <AddToCartButton
-              product={product as CartProduct}
-              variant="icon"
-              className="flex-1"
-            />
-          )}
+          <AddToCartButton
+            product={product as CartProduct}
+            variant="icon"
+            className="flex-1"
+          />
           <Button
             asChild
             size="sm"
             variant="outline"
-            className={`border-green-200 text-green-700 hover:bg-green-50 gap-1 text-xs h-9 px-2.5 ${isCatalogMode ? "flex-1" : ""}`}
+            className="border-green-200 text-green-700 hover:bg-green-50 gap-1 text-xs h-9 px-2.5"
           >
             <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
               <MessageCircle className="h-3.5 w-3.5" />
