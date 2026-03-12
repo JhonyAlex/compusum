@@ -63,9 +63,10 @@ interface SharedCartData {
 
 interface SharedCartViewProps {
   cart: SharedCartData;
+  catalogMode?: boolean;
 }
 
-export function SharedCartView({ cart }: SharedCartViewProps) {
+export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProps) {
   const [copied, setCopied] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
   const setOpen = useCartStore((s) => s.setOpen);
@@ -92,7 +93,7 @@ export function SharedCartView({ cart }: SharedCartViewProps) {
   };
 
   const generateWhatsAppMessage = () => {
-    let msg = "*Pedido CompuSum* 🛒\n\n";
+    let msg = catalogMode ? "*Cotización CompuSum* 📋\n\n" : "*Pedido CompuSum* 🛒\n\n";
     if (cart.customerName) msg += `*Cliente:* ${cart.customerName}\n`;
     if (cart.customerCompany) msg += `*Empresa:* ${cart.customerCompany}\n`;
     if (cart.city) msg += `*Ciudad:* ${cart.city.name}, ${cart.city.department}\n`;
@@ -101,10 +102,10 @@ export function SharedCartView({ cart }: SharedCartViewProps) {
       const price = item.unitPrice || item.product.wholesalePrice || item.product.price || 0;
       const ref = item.product.sku ? ` (Ref: ${item.product.sku})` : "";
       msg += `${i + 1}. ${item.product.name}${ref} x${item.quantity}`;
-      if (price) msg += ` - ${formatPrice(price)} c/u`;
+      if (!catalogMode && price) msg += ` - ${formatPrice(price)} c/u`;
       msg += "\n";
     });
-    if (subtotal > 0) msg += `\n*Subtotal:* ${formatPrice(subtotal)}`;
+    if (!catalogMode && subtotal > 0) msg += `\n*Subtotal:* ${formatPrice(subtotal)}`;
     return msg;
   };
 
@@ -205,9 +206,13 @@ export function SharedCartView({ cart }: SharedCartViewProps) {
                   )}
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-xs text-slate-500">x{item.quantity}</span>
-                    <span className="text-sm font-semibold text-blue-600">
-                      {formatPrice(price * item.quantity)}
-                    </span>
+                    {catalogMode ? (
+                      <span className="text-xs font-medium text-slate-500">Precio en cotización</span>
+                    ) : (
+                      <span className="text-sm font-semibold text-blue-600">
+                        {formatPrice(price * item.quantity)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -221,9 +226,15 @@ export function SharedCartView({ cart }: SharedCartViewProps) {
         <CardContent className="p-4">
           <div className="flex justify-between items-center">
             <span className="text-slate-600 font-medium">Subtotal</span>
-            <span className="text-2xl font-bold text-slate-900">{formatPrice(subtotal)}</span>
+            {catalogMode ? (
+              <span className="text-base font-semibold text-slate-500">Cotización personalizada</span>
+            ) : (
+              <span className="text-2xl font-bold text-slate-900">{formatPrice(subtotal)}</span>
+            )}
           </div>
-          <p className="text-xs text-slate-400 mt-1">Precios sujetos a confirmación</p>
+          <p className="text-xs text-slate-400 mt-1">
+            {catalogMode ? 'Modo catálogo activo. Los precios se comparten por cotización.' : 'Precios sujetos a confirmación'}
+          </p>
           {cart.notes && (
             <>
               <Separator className="my-3" />

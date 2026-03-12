@@ -1,70 +1,164 @@
 import { db } from './db';
 import { hashPassword } from './auth';
+import { Prisma } from '@prisma/client';
+import { randomBytes } from 'crypto';
+
+export function normalizePhone(phone?: string | null): string | null {
+  if (!phone) return null;
+  const digitsOnly = phone.replace(/\D/g, '');
+  return digitsOnly.length >= 7 ? digitsOnly : null;
+}
+
+export function normalizeEmail(email?: string | null): string | null {
+  if (!email) return null;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  return normalized;
+}
+
+export async function upsertCheckoutCustomer(
+  input: { name?: string | null; phone?: string | null; email?: string | null },
+  tx: any = db
+) {
+  const phone = normalizePhone(input.phone);
+  const email = normalizeEmail(input.email);
+
+  if (!phone && !email) {
+    return {
+      customer: null,
+      assignedAgentId: null,
+      normalizedPhone: null,
+      normalizedEmail: null,
+      isNewCustomer: false,
+    };
+  }
+
+  let customer: any = null;
+  if (phone) {
+    customer = await tx.user.findUnique({ where: { phone } });
+  }
+
+  if (!customer && email) {
+    customer = await tx.user.findUnique({ where: { email } });
+  }
+
+  if (customer) {
+    const updateData: Record<string, string> = {};
+
+    if (phone && !customer.phone) updateData.phone = phone;
+    if (email && !customer.email) updateData.email = email;
+
+    const incomingName = input.name?.trim();
+    if (incomingName && (!customer.name || customer.name === 'Nuevo Cliente')) {
+      updateData.name = incomingName.slice(0, 200);
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      customer = await tx.user.update({
+        where: { id: customer.id },
+        data: updateData,
+      });
+    }
+
+    return {
+      customer,
+      assignedAgentId: customer.assignedAgentId,
+      normalizedPhone: phone,
+      normalizedEmail: email,
+      isNewCustomer: false,
+    };
+  }
+
+  try {
+    const created = await tx.user.create({
+      data: {
+        phone,
+        email,
+        name: input.name?.trim().slice(0, 200) || 'Nuevo Cliente',
+        role: 'CUSTOMER',
+        password: await hashPassword(randomBytes(16).toString('hex')),
+      },
+    });
+
+    return {
+      customer: created,
+      assignedAgentId: null,
+      normalizedPhone: phone,
+      normalizedEmail: email,
+      isNewCustomer: true,
+    };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const existing = phone
+        ? await tx.user.findUnique({ where: { phone } })
+        : await tx.user.findUnique({ where: { email: email! } });
+
+      if (existing) {
+        return {
+          customer: existing,
+          assignedAgentId: existing.assignedAgentId,
+          normalizedPhone: phone,
+          normalizedEmail: email,
+          isNewCustomer: false,
+        };
+      }
+    }
+
+    throw error;
+  }
+}
+
+export async function findBestRouteForCity(cityId?: string | null, now = new Date(), tx: any = db) {
+  if (!cityId) return null;
+
+  const routes = await tx.shippingRoute.findMany({
+    where: {
+      cities: { some: { id: cityId } },
+      isActive: true,
+      departureDate: { not: null },
+    },
+    orderBy: { departureDate: 'asc' },
+    take: 10,
+  });
+
+  if (!routes.length) return null;
+
+  const openRoute = routes.find((route: any) => !route.cutOffTime || route.cutOffTime > now);
+  return openRoute || null;
+}
 
 export async function processCheckout(checkoutData: any) {
   const { phone, email, name, items, cityId, cartId } = checkoutData;
 
-  // 1. Lógica Upsert: Buscar por teléfono primero, luego por email
-  let customer: any = null;
-  if (phone) {
-    customer = await db.user.findUnique({ where: { phone } });
-  }
-  if (!customer && email) {
-      customer = await db.user.findUnique({ where: { email } });
-  }
+  return db.$transaction(async (tx: any) => {
+    const customerResult = await upsertCheckoutCustomer({ name, phone, email }, tx);
+    const availableRoute = await findBestRouteForCity(cityId, new Date(), tx);
 
-  let assignedAgentId = null;
-
-  if (customer) {
-    // Existe: Respetar su asesor comercial previo (si lo tiene)
-    assignedAgentId = customer.assignedAgentId;
-  } else {
-    // Nuevo: Crear perfil, se deja libre para asignación (o se asigna round-robin)
-    // Here we must provide a dummy password because the DB requires it
-    customer = await db.user.create({
+    const order = await tx.order.create({
       data: {
-        phone: phone || null,
-        email: email || null,
-        name: name || 'Nuevo Cliente',
-        role: 'CUSTOMER',
-        password: await hashPassword(Math.random().toString(36).slice(-8))
-      }
+        orderNumber: `ORD-${Date.now()}`,
+        cartId,
+        customerId: customerResult.customer?.id || null,
+        customerName: customerResult.customer?.name || name || 'Cliente',
+        customerEmail: customerResult.normalizedEmail,
+        customerPhone: customerResult.normalizedPhone,
+        agentId: customerResult.assignedAgentId,
+        cityId,
+        routeId: availableRoute?.id,
+        subtotal: calculateTotal(items),
+        items: {
+          create: items.map((item: any) => ({
+            productId: item.productId,
+            productName: item.productName || 'Product',
+            quantity: item.quantity,
+            unitPrice: item.price,
+          })),
+        },
+      },
     });
-  }
 
-  // 2. Encontrar la ruta logística válida más cercana
-  const availableRoute = await db.shippingRoute.findFirst({
-    where: {
-      cities: { some: { id: cityId } },
-      cutOffTime: { gt: new Date() }, // El cut-off time aún no ha pasado
-      isActive: true
-    },
-    orderBy: { departureDate: 'asc' }
+    return { order, route: availableRoute };
   });
-
-  // 3. Crear Pedido
-  const order = await db.order.create({
-    data: {
-      orderNumber: `ORD-${Date.now()}`,
-      cartId, // Requires an existing cart
-      customerId: customer.id,
-      customerName: customer.name,
-      agentId: assignedAgentId,
-      cityId,
-      routeId: availableRoute?.id,
-      subtotal: calculateTotal(items), // Calculado de forma segura en el backend
-      items: {
-        create: items.map((item: any) => ({
-          productId: item.productId,
-          productName: item.productName || "Product",
-          quantity: item.quantity,
-          unitPrice: item.price // Snapshot del precio actual
-        }))
-      }
-    }
-  });
-
-  return { order, route: availableRoute };
 }
 
 function calculateTotal(items: any[]) {

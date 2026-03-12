@@ -4,6 +4,7 @@ import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
 import { notFound } from "next/navigation";
 import { SharedCartView } from "@/components/store/shared-cart-view";
+import { isGlobalCatalogModeEnabled } from "@/lib/catalog-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function SharedCartPage({ params }: PageProps) {
   const { uuid } = await params;
+  const catalogMode = await isGlobalCatalogModeEnabled();
 
   const cart = await db.cart.findUnique({
     where: { uuid },
@@ -103,7 +105,7 @@ export default async function SharedCartPage({ params }: PageProps) {
       <Header />
       <main className="flex-1 py-8 md:py-12">
         <div className="container mx-auto px-4">
-          <SharedCartView cart={cartData} />
+          <SharedCartView cart={cartData} catalogMode={catalogMode} />
         </div>
       </main>
       <Footer />

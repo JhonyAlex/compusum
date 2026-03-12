@@ -33,10 +33,18 @@ interface DepartmentData {
   cities: CityData[];
 }
 
+interface ShippingEstimate {
+  status?: 'available' | 'cutoff_passed' | 'unavailable';
+  message: string;
+}
+
 export function CitySelector() {
   const [departments, setDepartments] = useState<DepartmentData[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [selectedCity, setSelectedCity] = useState<CityData | null>(null);
+  const [estimate, setEstimate] = useState<ShippingEstimate | null>(null);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [estimating, setEstimating] = useState(false);
   const [loading, setLoading] = useState(true);
   const setCustomerInfo = useCartStore((s) => s.setCustomerInfo);
   const cityId = useCartStore((s) => s.customerInfo.cityId);
@@ -70,14 +78,57 @@ export function CitySelector() {
   const handleDeptChange = (deptId: string) => {
     setSelectedDept(deptId);
     setSelectedCity(null);
+    setEstimate(null);
+    setEstimateError(null);
     setCustomerInfo({ cityId: "" });
   };
 
   const handleCityChange = (cityId: string) => {
     const city = currentDeptCities.find((c) => c.id === cityId) || null;
     setSelectedCity(city);
+    setEstimateError(null);
     setCustomerInfo({ cityId });
   };
+
+  useEffect(() => {
+    if (!selectedCity?.id) {
+      setEstimate(null);
+      setEstimateError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setEstimating(true);
+    setEstimateError(null);
+
+    fetch('/api/shipping/estimate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cityId: selectedCity.id }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.message) {
+          setEstimate({ status: data.status, message: data.message });
+        } else {
+          setEstimate(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEstimate(null);
+          setEstimateError('No se pudo calcular el envío en este momento. Intenta nuevamente.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setEstimating(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCity?.id]);
 
   if (loading) {
     return (
@@ -145,6 +196,42 @@ export function CitySelector() {
               Transportadora: {selectedCity.shippingRoute.shippingCompany}
             </p>
           )}
+        </div>
+      )}
+
+      {estimating && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="text-sm text-slate-600">Calculando próxima ruta para tu ciudad...</p>
+        </div>
+      )}
+
+      {!estimating && estimate && (
+        <div
+          className={`rounded-lg border p-3 ${
+            estimate.status === 'available'
+              ? 'border-emerald-200 bg-emerald-50'
+              : estimate.status === 'cutoff_passed'
+              ? 'border-amber-200 bg-amber-50'
+              : 'border-slate-200 bg-slate-50'
+          }`}
+        >
+          <p
+            className={`text-sm ${
+              estimate.status === 'available'
+                ? 'text-emerald-800'
+                : estimate.status === 'cutoff_passed'
+                ? 'text-amber-800'
+                : 'text-slate-700'
+            }`}
+          >
+            {estimate.message}
+          </p>
+        </div>
+      )}
+
+      {!estimating && estimateError && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+          <p className="text-sm text-rose-700">{estimateError}</p>
         </div>
       )}
     </div>

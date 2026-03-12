@@ -17,6 +17,7 @@ import { CrossSellSection } from "@/components/store/cross-sell-section";
 import { ShareCartMenu } from "@/components/store/share-cart-menu";
 import { formatPrice } from "@/lib/format";
 import Link from "next/link";
+import { useCatalogMode } from "@/hooks/use-catalog-mode";
 
 export function CartSheet() {
   const isOpen = useCartStore((s) => s.isOpen);
@@ -25,6 +26,7 @@ export function CartSheet() {
   const clearCart = useCartStore((s) => s.clearCart);
   const itemCount = useCartStore(getItemCount);
   const subtotal = useCartStore(getSubtotal);
+  const { catalogMode } = useCatalogMode();
 
   // Prevent hydration mismatch for Zustand persist
   const [mounted, setMounted] = useState(false);
@@ -88,7 +90,7 @@ export function CartSheet() {
             <ScrollArea className="flex-1 px-4">
               <div className="py-2">
                 {items.map((item) => (
-                  <CartItemRow key={item.product.id} item={item} />
+                  <CartItemRow key={item.product.id} item={item} hidePrices={catalogMode} />
                 ))}
               </div>
 
@@ -101,13 +103,17 @@ export function CartSheet() {
               {/* Subtotal */}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-600">Subtotal</span>
-                <span className="text-lg font-bold text-slate-900">
-                  {formatPrice(subtotal)}
-                </span>
+                {catalogMode ? (
+                  <span className="text-sm font-medium text-slate-500">Cotización personalizada</span>
+                ) : (
+                  <span className="text-lg font-bold text-slate-900">{formatPrice(subtotal)}</span>
+                )}
               </div>
-              <p className="text-[11px] text-slate-400">
-                Precios sujetos a confirmación. Envío no incluido.
-              </p>
+              {catalogMode ? (
+                <p className="text-[11px] text-slate-400">Modo catálogo activo. Los precios se comparten por cotización.</p>
+              ) : (
+                <p className="text-[11px] text-slate-400">Precios sujetos a confirmación. Envío no incluido.</p>
+              )}
 
               <Separator />
 

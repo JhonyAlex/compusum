@@ -1,29 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendToWebhook, buildWebhookPayload } from "@/lib/webhook";
+import { findBestRouteForCity, normalizeEmail, normalizePhone, upsertCheckoutCustomer } from "@/lib/checkout";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { cartId, customerName, customerEmail, customerPhone, customerCompany, cityId, notes, sentVia } = body;
 
-    if (!cartId || !customerName) {
+    if (!cartId) {
       return NextResponse.json(
-        { success: false, error: "Se requiere cartId y nombre del cliente" },
+        { success: false, error: "Se requiere cartId" },
+        { status: 400 }
+      );
+    }
+
+    const normalizedEmail = normalizeEmail(customerEmail);
+    const normalizedPhone = normalizePhone(customerPhone);
+
+    if (!customerName && !normalizedEmail && !normalizedPhone) {
+      return NextResponse.json(
+        { success: false, error: "Ingresa al menos nombre, teléfono o correo" },
         { status: 400 }
       );
     }
 
     // Validate email format if provided
-    if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+    if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return NextResponse.json(
         { success: false, error: "Formato de email inválido" },
         { status: 400 }
       );
     }
 
-    // Validate phone (digits, spaces, +, - only) if provided
-    if (customerPhone && !/^[\d\s+\-()]{7,20}$/.test(customerPhone)) {
+    if (customerPhone && !normalizedPhone) {
       return NextResponse.json(
         { success: false, error: "Formato de teléfono inválido" },
         { status: 400 }
@@ -31,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Sanitize text fields
-    const safeName = customerName.trim().slice(0, 200);
+    const safeName = customerName?.trim().slice(0, 200) || "Cliente";
     const safeCompany = customerCompany?.trim().slice(0, 200) || null;
     const safeNotes = notes?.trim().slice(0, 1000) || null;
 
@@ -57,6 +67,17 @@ export async function POST(request: NextRequest) {
 
     // Use a transaction to prevent race conditions in order number generation
     const order = await db.$transaction(async (tx) => {
+      const customerResult = await upsertCheckoutCustomer(
+        {
+          name: safeName,
+          phone: normalizedPhone,
+          email: normalizedEmail,
+        },
+        tx
+      );
+
+      const selectedRoute = await findBestRouteForCity(cityId || null, new Date(), tx);
+
       // Generate order number: CS-YYYYMMDD-XXXX (inside transaction for atomicity)
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       const countToday = await tx.order.count({
@@ -68,11 +89,14 @@ export async function POST(request: NextRequest) {
         data: {
           orderNumber,
           cartId,
+          customerId: customerResult.customer?.id || null,
+          agentId: customerResult.assignedAgentId || null,
           customerName: safeName,
-          customerEmail: customerEmail || null,
-          customerPhone: customerPhone || null,
+          customerEmail: normalizedEmail,
+          customerPhone: normalizedPhone,
           customerCompany: safeCompany,
           cityId: cityId || null,
+          routeId: selectedRoute?.id || null,
           notes: safeNotes,
           subtotal,
           sentVia: sentVia || null,

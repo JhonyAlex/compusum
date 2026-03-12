@@ -1,20 +1,32 @@
 import { db } from './db';
 import { hashPassword, verifyPassword, createSession } from './auth';
+import { randomBytes } from 'crypto';
+
+function normalizePhoneInput(phone: string): string {
+  return phone.replace(/\D/g, '');
+}
 
 export async function loginWithPhone(phone: string, otpCode: string): Promise<{ token: string; user: any }> {
-  // Real implementation must verify the OTP via a provider like Twilio/WhatsApp API here.
-  // For this mock/demo, we assume an OTP of "123456" is valid, any other is invalid.
-  const isValidOTP = otpCode === "123456";
+  const normalizedPhone = normalizePhoneInput(phone);
+  const isMockOtpEnabled = process.env.ENABLE_MOCK_PHONE_OTP === 'true';
+
+  // Temporary safeguard: block mock OTP in production unless explicitly enabled.
+  if (process.env.NODE_ENV === 'production' && !isMockOtpEnabled) {
+    throw new Error('Inicio de sesión por OTP temporalmente deshabilitado. Contacta soporte.');
+  }
+
+  const expectedOtp = process.env.MOCK_PHONE_OTP || '123456';
+  const isValidOTP = otpCode === expectedOtp;
   if (!isValidOTP) throw new Error("Código inválido");
 
-  let user = await db.user.findUnique({ where: { phone } });
+  let user = await db.user.findUnique({ where: { phone: normalizedPhone } });
 
   if (!user) {
     user = await db.user.create({
       data: {
-        phone,
+        phone: normalizedPhone,
         name: 'Nuevo Cliente',
-        password: await hashPassword(Math.random().toString(36).slice(-8)), // random mock password
+        password: await hashPassword(randomBytes(16).toString('hex')),
       }
     });
   }

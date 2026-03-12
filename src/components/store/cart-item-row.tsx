@@ -9,9 +9,10 @@ import { formatPrice } from "@/lib/format";
 
 interface CartItemRowProps {
   item: CartItem;
+  hidePrices?: boolean;
 }
 
-export function CartItemRow({ item }: CartItemRowProps) {
+export function CartItemRow({ item, hidePrices = false }: CartItemRowProps) {
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
 
@@ -71,9 +72,11 @@ export function CartItemRow({ item }: CartItemRowProps) {
 
           {/* Price & Remove */}
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-blue-600">
-              {formatPrice(lineTotal)}
-            </span>
+            {hidePrices ? (
+              <span className="text-xs font-medium text-slate-500">Precio en cotización</span>
+            ) : (
+              <span className="text-sm font-semibold text-blue-600">{formatPrice(lineTotal)}</span>
+            )}
             <Button
               variant="ghost"
               size="icon"

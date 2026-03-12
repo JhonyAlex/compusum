@@ -232,7 +232,7 @@ export function CheckoutFlow() {
               )}
               <div className="space-y-1">
                 {items.map((item) => (
-                  <CartItemRow key={item.product.id} item={item} />
+                  <CartItemRow key={item.product.id} item={item} hidePrices={catalogMode} />
                 ))}
               </div>
               <Separator className="my-4" />
