@@ -55,19 +55,28 @@ try {
       ? `${error.details.stdout}\n${error.details.stderr}`
       : "";
 
-  if (!message.includes("Prisma migrate deploy failed.") || !output.includes("P3005")) {
+  if (!message.includes("Prisma migrate deploy failed.")) {
     throw error;
   }
 
-  console.log("Baselining existing database with 0_init...");
-
-  try {
-    await run([bunExecutable, "x", "prisma", "migrate", "resolve", "--applied", "0_init"]);
-  } catch {
-    console.log("Skipping baseline resolve because 0_init was already recorded or could not be applied.");
+  if (output.includes("P3009")) {
+    const match = output.match(/The `(\S+)` migration started at .* failed/);
+    if (!match) throw error;
+    const failedMigration = match[1];
+    console.log(`Resolving failed migration as rolled-back: ${failedMigration}...`);
+    await run([bunExecutable, "x", "prisma", "migrate", "resolve", "--rolled-back", failedMigration]);
+    await run([bunExecutable, "x", "prisma", "migrate", "deploy"], "Prisma migrate deploy failed after resolving P3009.");
+  } else if (output.includes("P3005")) {
+    console.log("Baselining existing database with 0_init...");
+    try {
+      await run([bunExecutable, "x", "prisma", "migrate", "resolve", "--applied", "0_init"]);
+    } catch {
+      console.log("Skipping baseline resolve because 0_init was already recorded or could not be applied.");
+    }
+    await run([bunExecutable, "x", "prisma", "migrate", "deploy"], "Prisma migrate deploy failed after baseline.");
+  } else {
+    throw error;
   }
-
-  await run([bunExecutable, "x", "prisma", "migrate", "deploy"], "Prisma migrate deploy failed after baseline.");
 }
 
 await run([bunExecutable, "prisma/validate-operational-alignment.ts"], "Operational schema validation failed.");
