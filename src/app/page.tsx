@@ -30,7 +30,7 @@ import {
   TrendingUp
 } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600; // ⚡ Bolt: Cache homepage for 1 hour to prevent DB queries on every hit
 
 // Product Lines Data
 const productLines = [

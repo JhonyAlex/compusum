@@ -20,7 +20,7 @@ import {
   Package
 } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600; // ⚡ Bolt: Cache product catalog base data for 1 hour to prevent heavy category/brand aggregations
 
 const ITEMS_PER_PAGE = 12;
 

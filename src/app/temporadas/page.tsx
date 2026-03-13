@@ -8,7 +8,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Calendar, Package } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600; // ⚡ Bolt: Cache seasons for 1 hour to prevent DB queries on every request
 
 export default async function TemporadasPage() {
   let seasons: Awaited<ReturnType<typeof db.season.findMany>> = [];
