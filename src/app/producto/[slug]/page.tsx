@@ -21,7 +21,7 @@ import { ProductDetailCTA } from "@/components/store/product-detail-cta";
 import { formatPrice } from "@/lib/format";
 import { resolveCatalogMode, isGlobalCatalogModeEnabled } from "@/lib/catalog-mode";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600; // ⚡ Bolt: Cache product detail page for 1 hour to prevent DB load on popular products
 
 interface PageProps {
   params: Promise<{ slug: string }>;

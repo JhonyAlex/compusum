@@ -5,7 +5,7 @@ import { WhatsAppButton } from "@/components/store/whatsapp-button";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600; // ⚡ Bolt: Cache brands list for 1 hour to prevent expensive product counting queries
 
 // Brand data type
 type BrandWithCount = {
