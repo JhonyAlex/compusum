@@ -70,6 +70,9 @@ model Category {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   products        Product[]
+
+  @@index([isActive])
+  @@index([parentId])
 }
 
 // =====================
@@ -88,6 +91,8 @@ model Brand {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   products    Product[]
+
+  @@index([isActive])
 }
 
 // =====================
@@ -140,6 +145,12 @@ model Product {
   images           ProductImage[]
   seasons          ProductSeason[]
   cartItems        CartItem[]
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([isNew])
 }
 
 // =====================
