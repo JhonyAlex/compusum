@@ -47,11 +47,11 @@ export function Header() {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between py-2 text-sm">
             <div className="flex items-center gap-6">
-              <a href="tel:6063335206" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors">
+              <a href="tel:6063335206" aria-label="Llamar al 606 333-5206" className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 rounded-sm">
                 <Phone className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">606 333-5206</span>
               </a>
-              <a href="mailto:info@compusum.co" className="hidden md:flex items-center gap-2 text-slate-300 hover:text-white transition-colors">
+              <a href="mailto:info@compusum.co" aria-label="Enviar correo a info@compusum.co" className="hidden md:flex items-center gap-2 text-slate-300 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 rounded-sm">
                 <Mail className="h-3.5 w-3.5" />
                 <span>info@compusum.co</span>
               </a>
@@ -65,7 +65,8 @@ export function Header() {
                 href="https://wa.me/576063335206?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20precios%20mayoristas"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-green-400 hover:text-green-300 transition-colors"
+                aria-label="Contactar por WhatsApp para información de precios mayoristas (abre en una nueva pestaña)"
+                className="flex items-center gap-1.5 text-green-400 hover:text-green-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 rounded-sm"
               >
                 <MessageCircle className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">WhatsApp</span>
@@ -76,7 +77,7 @@ export function Header() {
       </div>
 
       {/* Main Navbar */}
-      <nav className="container mx-auto px-4">
+      <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
@@ -94,7 +95,7 @@ export function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-1">
+          <nav aria-label="Navegación principal" className="hidden lg:flex items-center gap-1">
             {navigation.map((item) => 
               item.hasSubmenu ? (
                 <DropdownMenu key={item.name}>
@@ -133,7 +134,7 @@ export function Header() {
                 </Link>
               )
             )}
-          </div>
+          </nav>
 
           {/* Actions */}
           <div className="flex items-center gap-3">
@@ -174,7 +175,7 @@ export function Header() {
                   </div>
                   
                   {/* Navigation */}
-                  <nav className="flex flex-col gap-1">
+                  <nav aria-label="Navegación móvil" className="flex flex-col gap-1">
                     <Link
                       href="/"
                       onClick={() => setIsOpen(false)}
@@ -263,7 +264,7 @@ export function Header() {
             </Sheet>
           </div>
         </div>
-      </nav>
+      </div>
     </header>
   );
 }
