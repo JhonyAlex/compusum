@@ -1,0 +1,3 @@
+## 2024-03-17 - Prevent redundant API requests in useEffect by extracting primitive values
+**Learning:** Using a complex object or array (like a Zustand global state array of cart `items`) as a dependency in a `useEffect` hook causes the effect to re-run whenever any property of the items changes (e.g., `quantity`), even if the actual data needed for the API request (like `categorySlug` or `product.id`s) hasn't changed.
+**Action:** Extract primitive derived values (e.g., `categorySlug` and a joined string of `cartProductIds`) during the render phase and use these primitives in the `useEffect` dependency array instead of the entire `items` array. This prevents redundant API requests when unrelated properties change.

@@ -42,16 +42,21 @@ export function CrossSellSection() {
       .catch(() => {});
   }, []);
 
+  // Performance optimization: Extract primitive values during render phase
+  // to prevent redundant API requests when unrelated item properties (like quantity) change
+  const categorySlug = items[0]?.product.category?.slug;
+  const cartProductIdsString = items.map((i) => i.product.id).join(",");
+
   useEffect(() => {
-    if (!enabled || items.length === 0) {
-      setSuggestions([]);
+    if (!enabled || !cartProductIdsString) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSuggestions((prev) => prev.length > 0 ? [] : prev);
       return;
     }
 
-    const categorySlug = items[0]?.product.category?.slug;
     if (!categorySlug) return;
 
-    const cartProductIds = new Set(items.map((i) => i.product.id));
+    const cartProductIds = new Set(cartProductIdsString.split(","));
 
     setLoading(true);
     fetch(`/api/products?categoria=${categorySlug}&limit=6`)
@@ -59,14 +64,14 @@ export function CrossSellSection() {
       .then((data) => {
         if (data.success && data.data) {
           const filtered = data.data
-            .filter((p: CrossSellProduct) => !cartProductIds.has(p.id))
+            .filter((p: CrossSellProduct) => !cartProductIds.has(String(p.id)))
             .slice(0, 3);
           setSuggestions(filtered);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [items, enabled]);
+  }, [categorySlug, cartProductIdsString, enabled]);
 
   if (suggestions.length === 0 || loading) return null;
 
