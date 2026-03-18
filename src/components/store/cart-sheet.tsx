@@ -55,6 +55,7 @@ export function CartSheet() {
                 size="sm"
                 className="text-xs text-slate-400 hover:text-red-500"
                 onClick={clearCart}
+                aria-label="Vaciar carrito"
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1" />
                 Vaciar
