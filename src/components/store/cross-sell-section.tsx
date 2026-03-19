@@ -31,6 +31,11 @@ export function CrossSellSection() {
   const [loading, setLoading] = useState(false);
   const [enabled, setEnabled] = useState(true);
 
+  // Extract primitive dependencies to prevent unnecessary API calls
+  // when cart quantities update (which changes the items array reference)
+  const categorySlug = items.length > 0 ? items[0]?.product.category?.slug : null;
+  const cartProductIdsString = items.map(i => i.product.id).sort().join(',');
+
   useEffect(() => {
     // Check if cross-sell is enabled via settings
     fetch("/api/settings")
@@ -43,15 +48,12 @@ export function CrossSellSection() {
   }, []);
 
   useEffect(() => {
-    if (!enabled || items.length === 0) {
+    if (!enabled || !categorySlug) {
       setSuggestions([]);
       return;
     }
 
-    const categorySlug = items[0]?.product.category?.slug;
-    if (!categorySlug) return;
-
-    const cartProductIds = new Set(items.map((i) => i.product.id));
+    const cartProductIds = new Set(cartProductIdsString.split(',').filter(Boolean));
 
     setLoading(true);
     fetch(`/api/products?categoria=${categorySlug}&limit=6`)
@@ -59,14 +61,14 @@ export function CrossSellSection() {
       .then((data) => {
         if (data.success && data.data) {
           const filtered = data.data
-            .filter((p: CrossSellProduct) => !cartProductIds.has(p.id))
+            .filter((p: CrossSellProduct) => !cartProductIds.has(String(p.id)))
             .slice(0, 3);
           setSuggestions(filtered);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [items, enabled]);
+  }, [enabled, categorySlug, cartProductIdsString]);
 
   if (suggestions.length === 0 || loading) return null;
 
