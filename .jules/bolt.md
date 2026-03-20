@@ -1,0 +1,3 @@
+## 2024-03-01 - Prevent Redundant API Fetches from Global Array Dependencies
+**Learning:** In Zustand global state setups (like the cart `items` array), using the entire array as a dependency in a `useEffect` hook causes unnecessary re-renders and re-fetches whenever any property within the array changes (like increasing item quantity), even if the relevant data for the effect (like `categorySlug`) remains identical.
+**Action:** Extract and derive primitive values (e.g., `categorySlug`, stringified IDs) during the render phase and use *these primitives* in the `useEffect` dependency array instead of passing the entire global state array.
