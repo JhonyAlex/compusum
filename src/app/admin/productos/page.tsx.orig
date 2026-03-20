@@ -341,7 +341,7 @@ export default async function AdminProductsPage({ searchParams }: Props) {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" asChild aria-label="Ver producto en la tienda">
+                            <Button variant="ghost" size="sm" asChild>
                               <Link
                                 href={`/producto/${product.slug}`}
                                 target="_blank"
@@ -349,7 +349,7 @@ export default async function AdminProductsPage({ searchParams }: Props) {
                                 <Eye className="h-4 w-4" />
                               </Link>
                             </Button>
-                            <Button variant="ghost" size="sm" asChild aria-label="Editar producto">
+                            <Button variant="ghost" size="sm" asChild>
                               <Link href={`/admin/productos/${product.id}`}>
                                 <Edit className="h-4 w-4" />
                               </Link>

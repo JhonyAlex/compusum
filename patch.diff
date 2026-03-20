@@ -1,0 +1,22 @@
+--- src/app/admin/productos/page.tsx
++++ src/app/admin/productos/page.tsx
+@@ -341,12 +341,12 @@
+                         </td>
+                         <td className="py-3 px-4">
+                           <div className="flex items-center justify-end gap-1">
+-                            <Button variant="ghost" size="sm" asChild>
++                            <Button variant="ghost" size="sm" asChild aria-label="Ver producto en la tienda">
+                               <Link
+                                 href={`/producto/${product.slug}`}
+                                 target="_blank"
+                               >
+                                 <Eye className="h-4 w-4" />
+                               </Link>
+                             </Button>
+-                            <Button variant="ghost" size="sm" asChild>
++                            <Button variant="ghost" size="sm" asChild aria-label="Editar producto">
+                               <Link href={`/admin/productos/${product.id}`}>
+                                 <Edit className="h-4 w-4" />
+                               </Link>
+                             </Button>
+                           </div>
