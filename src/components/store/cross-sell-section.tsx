@@ -42,18 +42,25 @@ export function CrossSellSection() {
       .catch(() => {});
   }, []);
 
+  // Extract primitive derived values to prevent redundant API requests
+  // when unrelated properties (like quantity) change.
+  const categorySlug = items[0]?.product.category?.slug;
+  // Use JSON.stringify to safely serialize IDs, preserving their type
+  const itemIdsJson = JSON.stringify(items.map((i) => i.product.id).sort());
+
   useEffect(() => {
-    if (!enabled || items.length === 0) {
-      setSuggestions([]);
+    if (!enabled || itemIdsJson === "[]") {
+      // Defer synchronous state clearing to avoid rendering cascade warnings
+      setTimeout(() => setSuggestions([]), 0);
       return;
     }
 
-    const categorySlug = items[0]?.product.category?.slug;
     if (!categorySlug) return;
 
-    const cartProductIds = new Set(items.map((i) => i.product.id));
+    const cartProductIds = new Set(JSON.parse(itemIdsJson));
 
-    setLoading(true);
+    // Defer loading state to avoid React cascading render warnings
+    setTimeout(() => setLoading(true), 0);
     fetch(`/api/products?categoria=${categorySlug}&limit=6`)
       .then((r) => r.json())
       .then((data) => {
@@ -66,7 +73,7 @@ export function CrossSellSection() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [items, enabled]);
+  }, [categorySlug, itemIdsJson, enabled]);
 
   if (suggestions.length === 0 || loading) return null;
 
