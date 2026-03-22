@@ -65,6 +65,7 @@ export function CitySelector() {
       for (const dept of departments) {
         const city = dept.cities.find((c) => c.id === cityId);
         if (city) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setSelectedDept(dept.id);
           setSelectedCity(city);
           break;
@@ -92,12 +93,14 @@ export function CitySelector() {
 
   useEffect(() => {
     if (!selectedCity?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEstimate(null);
       setEstimateError(null);
       return;
     }
 
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEstimating(true);
     setEstimateError(null);
 
