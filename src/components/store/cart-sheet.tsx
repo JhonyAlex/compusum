@@ -54,7 +54,11 @@ export function CartSheet() {
                 variant="ghost"
                 size="sm"
                 className="text-xs text-slate-400 hover:text-red-500"
-                onClick={clearCart}
+                onClick={() => {
+                  if (window.confirm("¿Estás seguro de que deseas vaciar el carrito?")) {
+                    clearCart();
+                  }
+                }}
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1" />
                 Vaciar
