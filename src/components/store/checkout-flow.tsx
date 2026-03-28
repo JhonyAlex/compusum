@@ -46,6 +46,7 @@ export function CheckoutFlow() {
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [cartDialogOpen, setCartDialogOpen] = useState(false);
@@ -159,6 +160,8 @@ export function CheckoutFlow() {
   const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(generateWhatsAppMessage())}`;
 
   const handleCreateOrder = async (sentVia: string) => {
+    setOrderError(null);
+
     // First save the cart if not already saved
     let cartId = savedCartUuid;
     if (!cartId) {
@@ -167,7 +170,8 @@ export function CheckoutFlow() {
     }
     if (!cartId) {
       toast.error("Error al guardar el carrito");
-      return;
+      setOrderError("No pudimos guardar el carrito antes de crear el pedido. Intentá nuevamente.");
+      return false;
     }
 
     setCreatingOrder(true);
@@ -177,7 +181,8 @@ export function CheckoutFlow() {
       const cartData = await cartRes.json();
       if (!cartData.success) {
         toast.error("Error al obtener el carrito guardado");
-        return;
+        setOrderError("No pudimos recuperar el carrito guardado. Intentá nuevamente.");
+        return false;
       }
 
       const res = await fetch("/api/orders", {
@@ -200,11 +205,16 @@ export function CheckoutFlow() {
         if (sentVia === "sistema") {
           setOrderDialogOpen(true);
         }
+        return true;
       } else {
         toast.error(data.error || "Error al crear pedido");
+        setOrderError(data.error || "No pudimos crear el pedido en este momento.");
+        return false;
       }
     } catch {
       toast.error("Error al crear el pedido");
+      setOrderError("Error interno al crear el pedido. Intentá nuevamente en unos minutos.");
+      return false;
     } finally {
       setCreatingOrder(false);
     }
@@ -421,13 +431,21 @@ export function CheckoutFlow() {
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {orderError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                      <p className="text-sm text-red-700">{orderError}</p>
+                    </div>
+                  )}
+
                   {/* Primary action */}
                   <Button
                     className="w-full bg-green-600 hover:bg-green-700 gap-2 h-12 text-base font-semibold"
                     disabled={creatingOrder}
-                    onClick={() => {
-                      handleCreateOrder("whatsapp");
-                      window.open(whatsappUrl, "_blank");
+                    onClick={async () => {
+                      const ok = await handleCreateOrder("whatsapp");
+                      if (ok) {
+                        window.open(whatsappUrl, "_blank");
+                      }
                     }}
                   >
                     <MessageCircle className="h-5 w-5" />
@@ -469,7 +487,7 @@ export function CheckoutFlow() {
 
               {/* Dialogs */}
               <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[28rem] sm:max-w-md">
                   <DialogHeader>
                     <div className="flex justify-center mb-2">
                       <div className="bg-green-100 rounded-full p-3">
@@ -480,7 +498,7 @@ export function CheckoutFlow() {
                       {catalogMode ? "¡Solicitud registrada!" : "¡Pedido registrado!"}
                     </DialogTitle>
                     <DialogDescription className="text-center">
-                      <span className="block font-mono text-base font-semibold text-slate-800 mt-1">
+                      <span className="block font-mono text-base font-semibold text-slate-800 mt-1 break-all">
                         {orderNumber}
                       </span>
                       <span className="block text-sm mt-3 text-slate-600">
@@ -496,7 +514,7 @@ export function CheckoutFlow() {
                         Enlace de tu carrito
                       </p>
                       <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                        <span className="text-xs text-slate-600 truncate flex-1 font-mono">
+                        <span className="text-xs text-slate-600 flex-1 min-w-0 font-mono break-all leading-tight">
                           {cartUrl}
                         </span>
                         <Button
@@ -527,7 +545,7 @@ export function CheckoutFlow() {
               </Dialog>
 
               <Dialog open={cartDialogOpen} onOpenChange={setCartDialogOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[28rem] sm:max-w-md">
                   <DialogHeader>
                     <div className="flex justify-center mb-2">
                       <div className="bg-blue-100 rounded-full p-3">
@@ -544,7 +562,7 @@ export function CheckoutFlow() {
                   {cartUrl && (
                     <div className="mt-2">
                       <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                        <span className="text-xs text-slate-600 truncate flex-1 font-mono">
+                        <span className="text-xs text-slate-600 flex-1 min-w-0 font-mono break-all leading-tight">
                           {cartUrl}
                         </span>
                         <Button

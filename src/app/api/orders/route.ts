@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { sendToWebhook, buildWebhookPayload } from "@/lib/webhook";
 import { findBestRouteForCity, normalizeEmail, normalizePhone, upsertCheckoutCustomer } from "@/lib/checkout";
 import { upsertOrder, findActiveOrder } from "@/lib/order-cart-upsert";
@@ -260,6 +261,32 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error managing order:", error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2022") {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "No pudimos procesar el pedido por una desalineación temporal de base de datos. Estamos trabajando para resolverlo.",
+            code: error.code,
+          },
+          { status: 500 }
+        );
+      }
+
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Ya existe un pedido activo asociado. Intentá de nuevo en unos segundos.",
+            code: error.code,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { success: false, error: "Error al procesar el pedido" },
       { status: 500 }
