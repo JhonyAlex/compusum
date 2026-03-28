@@ -1,7 +1,12 @@
 import { db } from './db';
 import { hashPassword } from './auth';
 import { Prisma } from '@prisma/client';
-import { randomBytes } from 'crypto';
+
+function generateTemporaryPassword(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 export function normalizePhone(phone?: string | null): string | null {
   if (!phone) return null;
@@ -76,7 +81,7 @@ export async function upsertCheckoutCustomer(
         email,
         name: input.name?.trim().slice(0, 200) || 'Nuevo Cliente',
         role: 'CUSTOMER',
-        password: await hashPassword(randomBytes(16).toString('hex')),
+        password: await hashPassword(generateTemporaryPassword()),
       },
     });
 

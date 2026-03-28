@@ -120,10 +120,13 @@ export async function POST(request: NextRequest) {
         return updated;
       });
 
-      // Actualizar estado del carrito
+      // Evita conflicto por unique(sessionId,status) cuando ya existe otro carrito convertido.
       await db.cart.update({
         where: { id: cartId },
-        data: { status: "convertido" },
+        data: {
+          status: "convertido",
+          sessionId: null,
+        },
       });
 
       // Intentar enviar a webhook (si cambiaron datos de contacto o monto)
@@ -218,10 +221,13 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Update cart status inside same transaction
+      // Evita conflicto por unique(sessionId,status) cuando ya existe otro carrito convertido.
       await tx.cart.update({
         where: { id: cartId },
-        data: { status: "convertido" },
+        data: {
+          status: "convertido",
+          sessionId: null,
+        },
       });
 
       return created;
@@ -276,10 +282,15 @@ export async function POST(request: NextRequest) {
       }
 
       if (error.code === "P2002") {
+        const target = (error.meta?.target as string[] | undefined)?.join(",") || "";
+        const isCartStatusConflict = target.includes("Cart_sessionId_status_key");
+
         return NextResponse.json(
           {
             success: false,
-            error: "Ya existe un pedido activo asociado. Intentá de nuevo en unos segundos.",
+            error: isCartStatusConflict
+              ? "Detectamos un conflicto temporal al convertir el carrito. Intentá nuevamente."
+              : "Ya existe un pedido activo asociado. Intentá de nuevo en unos segundos.",
             code: error.code,
           },
           { status: 409 }

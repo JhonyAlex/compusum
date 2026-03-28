@@ -1,6 +1,11 @@
 import { db } from './db';
 import { hashPassword, verifyPassword, createSession } from './auth';
-import { randomBytes } from 'crypto';
+
+function generateTemporaryPassword(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 function normalizePhoneInput(phone: string): string {
   return phone.replace(/\D/g, '');
@@ -26,7 +31,7 @@ export async function loginWithPhone(phone: string, otpCode: string): Promise<{ 
       data: {
         phone: normalizedPhone,
         name: 'Nuevo Cliente',
-        password: await hashPassword(randomBytes(16).toString('hex')),
+        password: await hashPassword(generateTemporaryPassword()),
       }
     });
   }
