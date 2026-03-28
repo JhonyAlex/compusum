@@ -10,7 +10,9 @@ import {
   MapPin,
   CheckCircle2,
   Save,
-  Share2,
+  Copy,
+  Check,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +20,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useCartStore, getSubtotal, getItemCount } from "@/stores/cart-store";
 import { CartItemRow } from "@/components/store/cart-item-row";
 import { CitySelector } from "@/components/store/city-selector";
@@ -38,6 +47,9 @@ export function CheckoutFlow() {
   const [saving, setSaving] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [cartDialogOpen, setCartDialogOpen] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [whatsappPhone, setWhatsappPhone] = useState("576063335206");
   const [catalogMode, setCatalogMode] = useState(false);
   const items = useCartStore((s) => s.items);
@@ -92,17 +104,34 @@ export function CheckoutFlow() {
       const data = await response.json();
       if (data.success) {
         setSavedCartUuid(data.data.uuid);
-        toast.success("Carrito guardado", {
-          description: "Puedes compartir el enlace para que otros lo vean",
-        });
+        return data.data.uuid as string;
       } else {
         toast.error("Error al guardar el carrito");
+        return null;
       }
     } catch {
       toast.error("Error al guardar el carrito");
+      return null;
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveCartAndShow = async () => {
+    const uuid = savedCartUuid || await handleSaveCart();
+    if (uuid) setCartDialogOpen(true);
+  };
+
+  const cartUrl =
+    typeof window !== "undefined" && savedCartUuid
+      ? `${window.location.origin}/carrito/${savedCartUuid}`
+      : null;
+
+  const handleCopyUrl = async () => {
+    if (!cartUrl) return;
+    await navigator.clipboard.writeText(cartUrl);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 2000);
   };
 
   const generateWhatsAppMessage = () => {
@@ -133,8 +162,8 @@ export function CheckoutFlow() {
     // First save the cart if not already saved
     let cartId = savedCartUuid;
     if (!cartId) {
-      await handleSaveCart();
-      cartId = useCartStore.getState().savedCartUuid;
+      cartId = await handleSaveCart();
+      if (!cartId) cartId = useCartStore.getState().savedCartUuid;
     }
     if (!cartId) {
       toast.error("Error al guardar el carrito");
@@ -168,7 +197,9 @@ export function CheckoutFlow() {
       const data = await res.json();
       if (data.success) {
         setOrderNumber(data.data.orderNumber);
-        toast.success(`Pedido ${data.data.orderNumber} creado`);
+        if (sentVia === "sistema") {
+          setOrderDialogOpen(true);
+        }
       } else {
         toast.error(data.error || "Error al crear pedido");
       }
@@ -329,15 +360,21 @@ export function CheckoutFlow() {
           {/* Step 3: Confirmar */}
           {currentStep === 3 && (
             <div>
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+              <h2 className="text-lg font-semibold text-slate-900 mb-1">
                 {catalogMode ? "Confirmar solicitud de cotización" : "Confirmar pedido"}
               </h2>
+              <p className="text-sm text-slate-500 mb-5">
+                Revisá el resumen y elegí cómo querés proceder
+              </p>
 
               {/* Summary card */}
-              <div className="bg-slate-50 rounded-lg p-4 space-y-2 mb-6">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 mb-6">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  Resumen
+                </p>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-600">Productos</span>
-                  <span className="font-medium">{itemCount} productos</span>
+                  <span className="font-medium">{itemCount} ítems</span>
                 </div>
                 {customerInfo.name && (
                   <div className="flex justify-between text-sm">
@@ -351,90 +388,191 @@ export function CheckoutFlow() {
                     <span className="font-medium">{customerInfo.company}</span>
                   </div>
                 )}
-                <Separator />
-                {catalogMode ? (
-                  <p className="text-sm text-slate-500 italic">
-                    Los precios serán cotizados de forma personalizada
+                {!catalogMode && subtotal > 0 && (
+                  <>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 font-medium">Subtotal</span>
+                      <span className="text-lg font-bold text-blue-600">{formatPrice(subtotal)}</span>
+                    </div>
+                    <p className="text-xs text-slate-400">Precios mayoristas sujetos a confirmación</p>
+                  </>
+                )}
+                {catalogMode && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-1">
+                    📋 Los precios serán cotizados de forma personalizada
                   </p>
-                ) : (
-                  <div className="flex justify-between">
-                    <span className="text-slate-600 font-medium">Subtotal</span>
-                    <span className="text-lg font-bold text-blue-600">{formatPrice(subtotal)}</span>
-                  </div>
                 )}
               </div>
 
               {/* Actions */}
-              <div className="space-y-3">
-                {orderNumber ? (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                    <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                    <p className="text-lg font-bold text-green-800">
-                      {catalogMode ? "Solicitud enviada" : "Pedido registrado"}
-                    </p>
-                    <p className="text-sm text-green-700 font-mono">{orderNumber}</p>
-                    <p className="text-xs text-green-600 mt-2">
-                      {catalogMode
-                        ? "Recibimos tu solicitud. Te enviaremos la cotización pronto."
-                        : "Tu pedido está registrado. Te contactaremos para confirmar."}
-                    </p>
+              {orderNumber && !orderDialogOpen ? (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-5 text-center">
+                  <CheckCircle2 className="h-10 w-10 text-green-600 mx-auto mb-3" />
+                  <p className="text-lg font-bold text-green-800">
+                    {catalogMode ? "¡Solicitud enviada!" : "¡Pedido registrado!"}
+                  </p>
+                  <p className="text-sm font-mono text-green-700 mt-1">{orderNumber}</p>
+                  <p className="text-xs text-green-600 mt-2">
+                    {catalogMode
+                      ? "Recibimos tu solicitud. Te enviaremos la cotización pronto."
+                      : "Tu pedido está registrado. Pronto nos comunicamos para confirmar los detalles."}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Primary action */}
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700 gap-2 h-12 text-base font-semibold"
+                    disabled={creatingOrder}
+                    onClick={() => {
+                      handleCreateOrder("whatsapp");
+                      window.open(whatsappUrl, "_blank");
+                    }}
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    {creatingOrder ? "Procesando..." : "Hacer pedido por WhatsApp"}
+                  </Button>
+
+                  <div className="flex items-center gap-3">
+                    <Separator className="flex-1" />
+                    <span className="text-xs text-slate-400 whitespace-nowrap">o también</span>
+                    <Separator className="flex-1" />
                   </div>
-                ) : (
-                  <>
-                    <Button
-                      className="w-full bg-green-600 hover:bg-green-700 gap-2 h-12 text-base"
-                      disabled={creatingOrder}
-                      onClick={() => {
-                        handleCreateOrder("whatsapp");
-                        window.open(whatsappUrl, "_blank");
-                      }}
-                    >
-                      <MessageCircle className="h-5 w-5" />
-                      {creatingOrder
-                        ? "Procesando..."
-                        : catalogMode
-                        ? "Solicitar cotización por WhatsApp"
-                        : "Confirmar y enviar por WhatsApp"}
-                    </Button>
 
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2"
-                      onClick={() => handleCreateOrder("sistema")}
-                      disabled={creatingOrder || saving}
-                    >
-                      <Save className="h-4 w-4" />
-                      {creatingOrder
-                        ? "Registrando..."
-                        : catalogMode
-                        ? "Solo registrar solicitud"
-                        : "Confirmar sin WhatsApp"}
-                    </Button>
-                  </>
-                )}
-
-                <div className="flex gap-2">
+                  {/* Secondary action */}
                   <Button
                     variant="outline"
-                    className="flex-1 gap-2"
-                    onClick={handleSaveCart}
-                    disabled={saving}
+                    className="w-full gap-2 h-11"
+                    onClick={() => handleCreateOrder("sistema")}
+                    disabled={creatingOrder || saving}
                   >
-                    <Save className="h-4 w-4" />
-                    {saving ? "Guardando..." : "Guardar para después"}
+                    <ClipboardCheck className="h-4 w-4" />
+                    {creatingOrder ? "Registrando..." : "Hacer pedido"}
                   </Button>
-                  <ShareCartMenu />
-                </div>
 
-                {savedCartUuid && !orderNumber && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-blue-800 font-medium mb-1">Carrito guardado</p>
-                    <p className="text-xs text-blue-600 break-all">
-                      {typeof window !== "undefined" && `${window.location.origin}/carrito/${savedCartUuid}`}
-                    </p>
+                  {/* Tertiary actions */}
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      variant="ghost"
+                      className="flex-1 gap-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 h-10"
+                      onClick={handleSaveCartAndShow}
+                      disabled={saving}
+                    >
+                      <Save className="h-4 w-4" />
+                      {saving ? "Guardando..." : "Guardar carrito"}
+                    </Button>
+                    <ShareCartMenu />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* Dialogs */}
+              <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <div className="flex justify-center mb-2">
+                      <div className="bg-green-100 rounded-full p-3">
+                        <CheckCircle2 className="h-8 w-8 text-green-600" />
+                      </div>
+                    </div>
+                    <DialogTitle className="text-center text-green-800">
+                      {catalogMode ? "¡Solicitud registrada!" : "¡Pedido registrado!"}
+                    </DialogTitle>
+                    <DialogDescription className="text-center">
+                      <span className="block font-mono text-base font-semibold text-slate-800 mt-1">
+                        {orderNumber}
+                      </span>
+                      <span className="block text-sm mt-3 text-slate-600">
+                        {catalogMode
+                          ? "Recibimos tu solicitud de cotización. Pronto nos vamos a comunicar con vos para enviarte los precios."
+                          : "Tu pedido quedó registrado. Pronto nos vamos a comunicar con vos para confirmar los detalles y coordinar la entrega."}
+                      </span>
+                    </DialogDescription>
+                  </DialogHeader>
+                  {cartUrl && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                        Enlace de tu carrito
+                      </p>
+                      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                        <span className="text-xs text-slate-600 truncate flex-1 font-mono">
+                          {cartUrl}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 shrink-0"
+                          onClick={handleCopyUrl}
+                        >
+                          {copiedUrl ? (
+                            <Check className="h-3.5 w-3.5 text-green-600" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1.5">
+                        Podés usar este enlace para retomar o compartir tu carrito
+                      </p>
+                    </div>
+                  )}
+                  <Button
+                    className="w-full mt-2 bg-blue-600 hover:bg-blue-700"
+                    onClick={() => setOrderDialogOpen(false)}
+                  >
+                    Entendido
+                  </Button>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={cartDialogOpen} onOpenChange={setCartDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <div className="flex justify-center mb-2">
+                      <div className="bg-blue-100 rounded-full p-3">
+                        <Save className="h-8 w-8 text-blue-600" />
+                      </div>
+                    </div>
+                    <DialogTitle className="text-center text-blue-800">
+                      ¡Carrito guardado!
+                    </DialogTitle>
+                    <DialogDescription className="text-center text-sm text-slate-600 mt-1">
+                      Tu carrito fue guardado. Podés retomarlo o compartirlo usando el siguiente enlace:
+                    </DialogDescription>
+                  </DialogHeader>
+                  {cartUrl && (
+                    <div className="mt-2">
+                      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                        <span className="text-xs text-slate-600 truncate flex-1 font-mono">
+                          {cartUrl}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 shrink-0"
+                          onClick={handleCopyUrl}
+                        >
+                          {copiedUrl ? (
+                            <Check className="h-3.5 w-3.5 text-green-600" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-2">
+                        Guardá este enlace para continuar tu pedido desde cualquier dispositivo
+                      </p>
+                    </div>
+                  )}
+                  <Button
+                    className="w-full mt-2 bg-blue-600 hover:bg-blue-700"
+                    onClick={() => setCartDialogOpen(false)}
+                  >
+                    Listo
+                  </Button>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
         </CardContent>
