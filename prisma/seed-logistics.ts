@@ -107,17 +107,30 @@ async function main() {
 
   for (const entry of shippingData) {
     if (!routeCache[entry.route.name]) {
-      const route = await prisma.shippingRoute.upsert({
-        where: { id: routeCache[entry.route.name] || "nonexistent" },
-        update: {},
-        create: {
-          name: entry.route.name,
-          estimatedDaysMin: entry.route.estimatedDaysMin,
-          estimatedDaysMax: entry.route.estimatedDaysMax,
-          shippingCompany: entry.route.shippingCompany,
-          sortOrder: entry.route.sortOrder,
-        },
+      const existingRoute = await prisma.shippingRoute.findFirst({
+        where: { name: entry.route.name },
       });
+
+      const route = existingRoute
+        ? await prisma.shippingRoute.update({
+            where: { id: existingRoute.id },
+            data: {
+              estimatedDaysMin: entry.route.estimatedDaysMin,
+              estimatedDaysMax: entry.route.estimatedDaysMax,
+              shippingCompany: entry.route.shippingCompany,
+              sortOrder: entry.route.sortOrder,
+            },
+          })
+        : await prisma.shippingRoute.create({
+            data: {
+              name: entry.route.name,
+              estimatedDaysMin: entry.route.estimatedDaysMin,
+              estimatedDaysMax: entry.route.estimatedDaysMax,
+              shippingCompany: entry.route.shippingCompany,
+              sortOrder: entry.route.sortOrder,
+            },
+          });
+
       routeCache[entry.route.name] = route.id;
       console.log(`  ✓ Ruta: ${route.name}`);
     }
