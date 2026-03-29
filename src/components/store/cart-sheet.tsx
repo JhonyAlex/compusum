@@ -5,6 +5,7 @@ import { ShoppingCart, Trash2, ArrowRight, MessageCircle, Share2 } from "lucide-
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -37,6 +38,7 @@ export function CartSheet() {
   return (
     <Sheet open={isOpen} onOpenChange={setOpen}>
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
+        <SheetDescription className="sr-only">Tu carrito de compras</SheetDescription>
         {/* Header */}
         <SheetHeader className="px-4 py-3 border-b border-slate-100">
           <div className="flex items-center justify-between pr-8">

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { HeaderCustomerMenu } from "@/components/store/header-customer-menu";
 import { 
@@ -163,6 +163,7 @@ export function Header() {
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] sm:w-[350px] bg-white p-0">
                 <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
+                <SheetDescription className="sr-only">Navegación principal del sitio</SheetDescription>
                 <div className="flex flex-col h-full px-4 pt-6 pb-4">
                   {/* Logo */}
                   <div className="flex items-center gap-2 mb-8 px-2">

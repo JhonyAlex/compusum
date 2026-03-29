@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ShoppingCart, Plus, Minus } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { ShoppingCart, Plus, Minus, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCartStore, type CartProduct } from "@/stores/cart-store";
 import { toast } from "sonner";
@@ -14,12 +14,17 @@ interface AddToCartButtonProps {
 
 export function AddToCartButton({ product, variant = "icon", className }: AddToCartButtonProps) {
   const [quantity, setQuantity] = useState(product.minWholesaleQty || 1);
+  const [added, setAdded] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const addItem = useCartStore((s) => s.addItem);
   const setOpen = useCartStore((s) => s.setOpen);
 
-  const handleAdd = () => {
+  const handleAdd = useCallback(() => {
     addItem(product, variant === "full" ? quantity : 1);
     setOpen(true);
+    setAdded(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setAdded(false), 1200);
     toast.success("Producto agregado al carrito", {
       description: product.name,
       action: {
@@ -27,17 +32,25 @@ export function AddToCartButton({ product, variant = "icon", className }: AddToC
         onClick: () => setOpen(true),
       },
     });
-  };
+  }, [addItem, product, variant, quantity, setOpen]);
 
   if (variant === "icon") {
     return (
       <Button
         size="sm"
         onClick={handleAdd}
-        className={`bg-blue-600 hover:bg-blue-700 text-white gap-1.5 text-xs h-9 ${className || ""}`}
+        className={`${
+          added
+            ? "bg-green-600 hover:bg-green-700"
+            : "bg-blue-600 hover:bg-blue-700 hover:shadow-md hover:-translate-y-0.5"
+        } active:scale-95 text-white gap-1.5 text-xs h-9 transition-all duration-200 ${className || ""}`}
       >
-        <ShoppingCart className="h-3.5 w-3.5" />
-        Agregar
+        {added ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <ShoppingCart className="h-3.5 w-3.5" />
+        )}
+        {added ? "Agregado" : "Agregar"}
       </Button>
     );
   }
@@ -70,11 +83,19 @@ export function AddToCartButton({ product, variant = "icon", className }: AddToC
       </div>
       <Button
         onClick={handleAdd}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"
+        className={`w-full ${
+          added
+            ? "bg-green-600 hover:bg-green-700"
+            : "bg-blue-600 hover:bg-blue-700 hover:shadow-md"
+        } active:scale-[0.98] text-white gap-2 transition-all duration-200`}
         disabled={product.stockStatus === "agotado"}
       >
-        <ShoppingCart className="h-4 w-4" />
-        Agregar al carrito
+        {added ? (
+          <Check className="h-4 w-4" />
+        ) : (
+          <ShoppingCart className="h-4 w-4" />
+        )}
+        {added ? "¡Agregado al carrito!" : "Agregar al carrito"}
       </Button>
     </div>
   );
