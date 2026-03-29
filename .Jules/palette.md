@@ -1,0 +1,7 @@
+## 2024-05-19 - Improved Dropdown Menu Button Accessibility
+**Learning:** Found that the main navigation dropdown trigger button in the Header lacked an aria-expanded and aria-haspopup attribute, and used an implicitly associated `DropdownMenuTrigger` which may not always transfer the correct states. We also noticed it's useful to provide an explicit aria-label for non-textual icon actions.
+**Action:** Always ensure dropdown triggers or buttons that open submenus have correct WAI-ARIA properties to indicate their purpose and state to screen reader users. Added explicit `aria-expanded` and `aria-haspopup` along with an `aria-label` where it makes sense.
+
+## 2025-02-12 - Hero Search Bar Accessibility Fix
+**Learning:** Found that a primary search input (`HeroSearchBar`) was missing an explicit screen-reader label, its `type` was `text` rather than `search` (which hinders mobile keyboard UX and semantic behavior), and an adjacent icon was being announced redundantly. Screen-reader users require a `<label>` (either visible or with `sr-only`) connected via `id`, or an `aria-label` directly on the input. `aria-hidden="true"` is also necessary on purely decorative icons inside search inputs.
+**Action:** Always provide an explicitly associated `<label>` (using `sr-only` if a visible one breaks the design) and use `type="search"` on search inputs. For any accompanying non-interactive icons, apply `aria-hidden="true"`.

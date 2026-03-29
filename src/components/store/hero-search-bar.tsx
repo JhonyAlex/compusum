@@ -26,9 +26,13 @@ export function HeroSearchBar() {
       className="flex w-full max-w-md mx-auto mt-6 sm:mt-8"
     >
       <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <label htmlFor="hero-search" className="sr-only">
+          Buscar productos
+        </label>
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" aria-hidden="true" />
         <Input
-          type="text"
+          id="hero-search"
+          type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar productos, marcas, referencias..."
