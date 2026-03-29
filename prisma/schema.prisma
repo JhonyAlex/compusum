@@ -244,21 +244,22 @@ model City {
 // RUTAS DE ENVÍO
 // =====================
 model ShippingRoute {
-  id               String    @id @default(cuid())
-  name             String
-  estimatedDaysMin Int
-  estimatedDaysMax Int
-  shippingCompany  String?
-  notes            String?
-  isActive         Boolean   @default(true)
-  capacity         Int?
-  cutOffTime       DateTime?
-  departureDate    DateTime?
-  sortOrder        Int       @default(0)
-  cities           City[]
-  orders           Order[]
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  name                  String
+  estimatedDaysMin      Int
+  estimatedDaysMax      Int
+  shippingCompany       String?
+  notes                 String?
+  isActive              Boolean   @default(true)
+  capacity              Int?
+  cutOffTime            DateTime?
+  departureDate         DateTime? // Legacy: use departureDaysOfWeek instead
+  departureDaysOfWeek   Int[]     @default([1]) // 0=Sun, 1=Mon, 2=Tue...6=Sat
+  sortOrder             Int       @default(0)
+  cities                City[]
+  orders                Order[]
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 }
 
 // =====================

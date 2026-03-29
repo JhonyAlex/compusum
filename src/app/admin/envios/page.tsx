@@ -76,11 +76,25 @@ export default async function AdminEnviosPage({
     const shippingCompany = String(formData.get("shippingCompany") || "").trim() || null;
     const notes = String(formData.get("notes") || "").trim() || null;
     const sortOrder = Number(formData.get("sortOrder") || 0);
-    const departureDateRaw = String(formData.get("departureDate") || "").trim();
     const cutOffTimeRaw = String(formData.get("cutOffTime") || "").trim();
+
+    // Extract selected departure days from checkboxes: departureDays-0, departureDays-1, etc.
+    const departureDaysOfWeek: number[] = [];
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith("departureDays-")) {
+        const dayNum = parseInt(key.replace("departureDays-", ""));
+        if (!isNaN(dayNum) && value === "on") {
+          departureDaysOfWeek.push(dayNum);
+        }
+      }
+    }
 
     if (!name || estimatedDaysMin < 0 || estimatedDaysMax < 0 || estimatedDaysMax < estimatedDaysMin) {
       redirect("/admin/envios?error=route-invalid");
+    }
+
+    if (departureDaysOfWeek.length === 0) {
+      redirect("/admin/envios?error=route-no-days");
     }
 
     await db.shippingRoute.create({
@@ -91,8 +105,8 @@ export default async function AdminEnviosPage({
         shippingCompany,
         notes,
         sortOrder,
-        departureDate: departureDateRaw ? new Date(departureDateRaw) : null,
         cutOffTime: cutOffTimeRaw ? new Date(cutOffTimeRaw) : null,
+        departureDaysOfWeek,
       },
     });
 
@@ -110,12 +124,26 @@ export default async function AdminEnviosPage({
     const shippingCompany = String(formData.get("shippingCompany") || "").trim() || null;
     const notes = String(formData.get("notes") || "").trim() || null;
     const sortOrder = Number(formData.get("sortOrder") || 0);
-    const departureDateRaw = String(formData.get("departureDate") || "").trim();
     const cutOffTimeRaw = String(formData.get("cutOffTime") || "").trim();
     const isActive = formData.get("isActive") === "on";
 
+    // Extract selected departure days from checkboxes
+    const departureDaysOfWeek: number[] = [];
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith("departureDays-")) {
+        const dayNum = parseInt(key.replace("departureDays-", ""));
+        if (!isNaN(dayNum) && value === "on") {
+          departureDaysOfWeek.push(dayNum);
+        }
+      }
+    }
+
     if (!id || estimatedDaysMin < 0 || estimatedDaysMax < 0 || estimatedDaysMax < estimatedDaysMin) {
       redirect("/admin/envios?error=route-update-invalid");
+    }
+
+    if (departureDaysOfWeek.length === 0) {
+      redirect("/admin/envios?error=route-no-days");
     }
 
     await db.shippingRoute.update({
@@ -127,8 +155,8 @@ export default async function AdminEnviosPage({
         notes,
         sortOrder,
         isActive,
-        departureDate: departureDateRaw ? new Date(departureDateRaw) : null,
         cutOffTime: cutOffTimeRaw ? new Date(cutOffTimeRaw) : null,
+        departureDaysOfWeek,
       },
     });
 
@@ -269,8 +297,22 @@ export default async function AdminEnviosPage({
                   <Input id="route-sort" name="sortOrder" type="number" min={0} defaultValue={0} />
                 </div>
                 <div>
-                  <Label htmlFor="route-departure">Próxima salida</Label>
-                  <Input id="route-departure" name="departureDate" type="datetime-local" />
+                  <Label>Días de salida</Label>
+                  <div className="space-y-2 mt-2">
+                    {["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"].map(
+                      (day, idx) => (
+                        <label key={idx} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            name={`departureDays-${idx}`}
+                            defaultChecked={idx === 1} // Default to Monday
+                            className="rounded"
+                          />
+                          {day}
+                        </label>
+                      )
+                    )}
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="route-cutoff">Hora de corte</Label>
@@ -361,54 +403,92 @@ export default async function AdminEnviosPage({
             )}
 
             {routes.map((route) => (
-              <form key={route.id} action={updateRoute} className="grid grid-cols-1 md:grid-cols-7 gap-2 items-end border border-slate-200 rounded-lg p-3">
+              <form key={route.id} action={updateRoute} className="border border-slate-200 rounded-lg p-4 space-y-3">
                 <input type="hidden" name="id" value={route.id} />
 
-                <div className="md:col-span-2">
-                  <Label>Ruta</Label>
-                  <div className="h-10 px-3 rounded-md border border-slate-200 bg-slate-50 flex items-center text-sm">
-                    {route.name}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <Label>Ruta</Label>
+                    <div className="h-10 px-3 rounded-md border border-slate-200 bg-slate-50 flex items-center text-sm font-medium">
+                      {route.name}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Estimación (min-max días)</Label>
+                    <div className="grid grid-cols-2 gap-1">
+                      <Input
+                        name="estimatedDaysMin"
+                        type="number"
+                        min={0}
+                        defaultValue={route.estimatedDaysMin}
+                        required
+                      />
+                      <Input
+                        name="estimatedDaysMax"
+                        type="number"
+                        min={0}
+                        defaultValue={route.estimatedDaysMax}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Corte de pedidos</Label>
+                    <Input
+                      name="cutOffTime"
+                      type="datetime-local"
+                      defaultValue={toDateTimeLocal(route.cutOffTime)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Transportadora</Label>
+                    <Input name="shippingCompany" defaultValue={route.shippingCompany || ""} />
                   </div>
                 </div>
 
                 <div>
-                  <Label>Días</Label>
-                  <div className="grid grid-cols-2 gap-1">
-                    <Input name="estimatedDaysMin" type="number" min={0} defaultValue={route.estimatedDaysMin} required />
-                    <Input name="estimatedDaysMax" type="number" min={0} defaultValue={route.estimatedDaysMax} required />
+                  <Label className="font-medium mb-3 block">Días de salida</Label>
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                    {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((day, idx) => (
+                      <label key={idx} className="flex items-center gap-2 rounded border border-slate-200 p-2 hover:bg-slate-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name={`departureDays-${idx}`}
+                          defaultChecked={(route.departureDaysOfWeek || []).includes(idx)}
+                          className="rounded"
+                        />
+                        <span className="text-sm font-medium">{day}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 
-                <div>
-                  <Label>Salida</Label>
-                  <Input name="departureDate" type="datetime-local" defaultValue={toDateTimeLocal(route.departureDate)} />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+                  <div>
+                    <Label htmlFor={`notes-${route.id}`}>Notas</Label>
+                    <Input
+                      id={`notes-${route.id}`}
+                      name="notes"
+                      defaultValue={route.notes || ""}
+                      placeholder="Observaciones internas"
+                    />
+                  </div>
 
-                <div>
-                  <Label>Corte</Label>
-                  <Input name="cutOffTime" type="datetime-local" defaultValue={toDateTimeLocal(route.cutOffTime)} />
-                </div>
+                  <div className="flex items-end gap-2 pt-2">
+                    <label className="text-sm flex items-center gap-2">
+                      <input type="checkbox" name="isActive" defaultChecked={route.isActive} />
+                      <span>Activa</span>
+                    </label>
+                    <Label>Orden</Label>
+                    <Input name="sortOrder" type="number" min={0} defaultValue={route.sortOrder} className="w-20" />
+                  </div>
 
-                <div>
-                  <Label>Transportadora</Label>
-                  <Input name="shippingCompany" defaultValue={route.shippingCompany || ""} />
-                </div>
-
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-sm flex items-center gap-2">
-                    <input type="checkbox" name="isActive" defaultChecked={route.isActive} />
-                    Activa
-                  </label>
-                  <Input name="sortOrder" type="number" min={0} defaultValue={route.sortOrder} className="w-20" />
-                </div>
-
-                <div className="md:col-span-6">
-                  <Label>Notas</Label>
-                  <Input name="notes" defaultValue={route.notes || ""} />
-                </div>
-
-                <div className="md:col-span-1">
-                  <Button type="submit" className="w-full">Actualizar</Button>
+                  <Button type="submit" className="w-full md:w-auto">
+                    Actualizar ruta
+                  </Button>
                 </div>
               </form>
             ))}

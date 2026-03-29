@@ -1,61 +1,63 @@
 import { db } from './db';
-import { differenceInHours, isToday, isTomorrow, format } from 'date-fns';
+import { differenceInHours } from 'date-fns';
+import { getNextRouteDeparture, buildRouteMessage } from './route-schedule';
 
 export async function getShippingEstimation(cityId: string) {
   const now = new Date();
 
-  const upcomingRoutes = await db.shippingRoute.findMany({
-    where: {
-      cities: { some: { id: cityId } },
-      isActive: true,
-      departureDate: { not: null },
+  // Busca la ruta activa asignada a esta ciudad
+  const city = await db.city.findUnique({
+    where: { id: cityId },
+    include: {
+      shippingRoute: true,
     },
-    orderBy: { departureDate: 'asc' },
-    take: 8,
   });
 
-  if (!upcomingRoutes.length) {
+  if (!city || !city.shippingRoute || !city.shippingRoute.isActive) {
     return {
       status: 'unavailable',
       message: 'Actualmente no tenemos rutas programadas para esta ciudad. Te contactaremos pronto.',
     };
   }
 
-  const openRoute = upcomingRoutes.find((route) => !route.cutOffTime || route.cutOffTime > now);
-  if (!openRoute || !openRoute.departureDate) {
-    const firstRoute = upcomingRoutes[0];
+  const route = city.shippingRoute;
+  const departureDaysOfWeek = route.departureDaysOfWeek || [1]; // fallback a lunes si no existe
+
+  try {
+    const { nextDepartureDate, daysUntilDeparture, dayName } = getNextRouteDeparture(now, departureDaysOfWeek);
+
+    // Verifica si el cutoff ha pasado
+    if (route.cutOffTime && route.cutOffTime <= now) {
+      return {
+        status: 'cutoff_passed',
+        routeId: route.id,
+        message: `El corte para la próxima salida (${dayName}) ya cerró. Contáctanos para confirmar.`,
+      };
+    }
+
+    const hoursLeft = route.cutOffTime ? Math.max(0, differenceInHours(route.cutOffTime, now)) : null;
+
+    const feedbackMessage = buildRouteMessage(
+      daysUntilDeparture,
+      dayName,
+      route.estimatedDaysMin,
+      route.estimatedDaysMax
+    );
+
     return {
-      status: 'cutoff_passed',
-      routeId: firstRoute.id,
-      message: `El corte para la ruta del ${format(firstRoute.departureDate as Date, 'dd/MM/yyyy')} ya cerró. Contáctanos para confirmar la próxima salida.`,
+      status: 'available',
+      routeId: route.id,
+      message: feedbackMessage,
+      routeName: route.name,
+      nextDepartureDate,
+      daysUntilDeparture,
+      cutOffTime: route.cutOffTime,
+      hoursLeft,
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      message: 'Error al calcular la ruta. Por favor intenta de nuevo.',
     };
   }
-
-  const hoursLeft = openRoute.cutOffTime ? Math.max(0, differenceInHours(openRoute.cutOffTime, now)) : null;
-  const routeDate = openRoute.departureDate;
-  let feedbackMessage = '';
-
-  if (isToday(routeDate)) {
-    feedbackMessage = 'Estamos en tu ciudad hoy. Aún puedes ingresar tu pedido para esta ruta.';
-  } else if (isTomorrow(routeDate)) {
-    feedbackMessage = hoursLeft !== null
-      ? `El próximo envío a tu ciudad es mañana. Te quedan ${hoursLeft} horas para que tu pedido entre en esta ruta.`
-      : 'El próximo envío a tu ciudad es mañana.';
-  } else {
-    feedbackMessage = hoursLeft !== null
-      ? `El próximo envío a tu ciudad es el ${format(routeDate, 'dd/MM/yyyy')}. Tienes ${hoursLeft} horas para que entre en la ruta.`
-      : `El próximo envío a tu ciudad es el ${format(routeDate, 'dd/MM/yyyy')}.`;
-  }
-
-  return {
-    status: 'available',
-    routeId: openRoute.id,
-    message: feedbackMessage,
-    routeName: openRoute.name,
-    departureDate: routeDate,
-    cutOffTime: openRoute.cutOffTime,
-    estimatedDaysMin: openRoute.estimatedDaysMin,
-    estimatedDaysMax: openRoute.estimatedDaysMax,
-    hoursLeft,
-  };
 }
