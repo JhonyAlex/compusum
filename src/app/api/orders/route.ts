@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { sendToWebhook, buildWebhookPayload } from "@/lib/webhook";
 import { findBestRouteForCity, normalizeEmail, normalizePhone, upsertCheckoutCustomer } from "@/lib/checkout";
 import { upsertOrder, findActiveOrder } from "@/lib/order-cart-upsert";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,9 +20,10 @@ export async function POST(request: NextRequest) {
 
     // Obtener sessionId del header (viene del middleware)
     const sessionId = request.headers.get("x-session-id");
-    
-    // TODO: Obtener userId si está autenticado (desde sesión/token)
-    const userId: string | null = null;
+
+    // Resolver userId si hay sesión autenticada activa
+    const currentUser = await getCurrentUser();
+    const userId = currentUser?.id ?? null;
 
     const normalizedEmail = normalizeEmail(customerEmail);
     const normalizedPhone = normalizePhone(customerPhone);

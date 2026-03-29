@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loginWithPhone, loginWithPassword } from '@/lib/auth-dual';
+import { isPhoneOtpLoginEnabled, loginWithPhone, loginWithPassword } from '@/lib/auth-dual';
 import { setSessionCookie } from '@/lib/auth';
 
 type LoginMethod = 'phone' | 'password';
@@ -58,9 +58,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const method = (body.method as LoginMethod) || 'phone';
 
-    if (method === 'phone' && process.env.NODE_ENV === 'production' && process.env.ENABLE_MOCK_PHONE_OTP !== 'true') {
+    if (method === 'phone' && !isPhoneOtpLoginEnabled()) {
       return NextResponse.json(
-        { success: false, error: 'Inicio de sesión por OTP no disponible temporalmente.' },
+        { success: false, error: 'Inicio de sesión por OTP no disponible. Configura Twilio Verify.' },
         { status: 503 }
       );
     }

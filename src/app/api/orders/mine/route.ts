@@ -1,0 +1,50 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
+
+/**
+ * GET /api/orders/mine
+ * Devuelve los pedidos del visitante actual.
+ * - Si hay sesión autenticada: muestra por customerId.
+ * - Si es invitado: muestra por sessionId (viene del middleware x-session-id).
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const sessionId = request.headers.get("x-session-id");
+    const currentUser = await getCurrentUser();
+    const userId = currentUser?.id ?? null;
+
+    if (!sessionId && !userId) {
+      return NextResponse.json({ success: true, data: [] });
+    }
+
+    const orConditions: Array<{ sessionId?: string; customerId?: string }> = [];
+    if (userId) orConditions.push({ customerId: userId });
+    if (sessionId) orConditions.push({ sessionId });
+
+    const orders = await db.order.findMany({
+      where: { OR: orConditions },
+      include: {
+        items: {
+          select: {
+            id: true,
+            productName: true,
+            productSku: true,
+            quantity: true,
+            unitPrice: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    return NextResponse.json({ success: true, data: orders });
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    return NextResponse.json(
+      { success: false, error: "Error al obtener pedidos" },
+      { status: 500 }
+    );
+  }
+}

@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { loginWithPhone } from '@/lib/auth-dual';
+import { isPhoneOtpLoginEnabled, loginWithPhone } from '@/lib/auth-dual';
 import { setSessionCookie } from '@/lib/auth';
+import { transferSessionCartToUser, transferSessionOrderToUser } from '@/lib/order-cart-upsert';
 
 export async function POST(req: Request) {
   try {
-    if (process.env.NODE_ENV === 'production' && process.env.ENABLE_MOCK_PHONE_OTP !== 'true') {
+    if (!isPhoneOtpLoginEnabled()) {
       return NextResponse.json(
-        { success: false, error: 'Inicio de sesión por OTP no disponible temporalmente.' },
+        { success: false, error: 'Inicio de sesión por OTP no disponible. Configura Twilio Verify.' },
         { status: 503 }
       );
     }
@@ -19,6 +20,15 @@ export async function POST(req: Request) {
 
     const result = await loginWithPhone(phone, otpCode);
     await setSessionCookie(result.token);
+
+    // Transferir carrito y pedidos de la sesión de invitado al usuario
+    const sessionId = req.headers.get('x-session-id');
+    if (sessionId && result.user?.id) {
+      await Promise.all([
+        transferSessionCartToUser(sessionId, result.user.id),
+        transferSessionOrderToUser(sessionId, result.user.id),
+      ]).catch((e) => console.error('Error transfiriendo sesión al usuario:', e));
+    }
 
     return NextResponse.json({
       success: true,

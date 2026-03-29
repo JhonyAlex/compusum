@@ -54,6 +54,8 @@ interface CartState {
   setCustomerInfo: (info: Partial<CustomerInfo>) => void;
   setSavedCartUuid: (uuid: string | null) => void;
   loadItems: (items: CartItem[]) => void;
+  /** Persiste el carrito actual en el servidor (fire-and-forget, sin bloquear UI). */
+  syncToServer: () => Promise<void>;
 }
 
 export const useCartStore = create<CartState>()(
@@ -112,6 +114,44 @@ export const useCartStore = create<CartState>()(
       setSavedCartUuid: (uuid) => set({ savedCartUuid: uuid }),
 
       loadItems: (items) => set({ items }),
+
+      syncToServer: async () => {
+        const { items, customerInfo } = get();
+        if (items.length === 0) return;
+
+        const body = {
+          items: items.map((item) => ({
+            productId: item.product.id,
+            quantity: item.quantity,
+            unitPrice:
+              item.product.wholesalePrice ?? item.product.price ?? undefined,
+          })),
+          customerName: customerInfo.name || undefined,
+          customerEmail: customerInfo.email || undefined,
+          customerPhone: customerInfo.phone || undefined,
+          customerCompany: customerInfo.company || undefined,
+          cityId: customerInfo.cityId || undefined,
+          notes: customerInfo.notes || undefined,
+          action: 'save',
+        };
+
+        try {
+          const res = await fetch('/api/carts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.data?.uuid) {
+              set({ savedCartUuid: data.data.uuid });
+            }
+          }
+        } catch {
+          // Silencioso: localStorage ya guardó los items
+        }
+      },
     }),
     {
       name: "compusum-cart",

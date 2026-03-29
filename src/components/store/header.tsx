@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { HeaderCustomerMenu } from "@/components/store/header-customer-menu";
 import { 
   Menu, 
   Phone, 
@@ -139,6 +140,9 @@ export function Header() {
           <div className="flex items-center gap-3">
             {/* Cart Button */}
             <CartIconButton />
+
+            {/* Customer Menu (Mi Cuenta) */}
+            <HeaderCustomerMenu />
 
             {/* CTA Button */}
             <Button

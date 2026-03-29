@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyPassword, createSession, setSessionCookie } from '@/lib/auth';
+import { transferSessionCartToUser, transferSessionOrderToUser } from '@/lib/order-cart-upsert';
 
 // POST /api/auth/login - Login admin user
 export async function POST(request: Request) {
@@ -49,6 +50,15 @@ export async function POST(request: Request) {
     // Create session
     const token = await createSession(user.id);
     await setSessionCookie(token);
+
+    // Transferir carrito y pedidos de la sesión de invitado al usuario
+    const sessionId = request.headers.get('x-session-id');
+    if (sessionId) {
+      await Promise.all([
+        transferSessionCartToUser(sessionId, user.id),
+        transferSessionOrderToUser(sessionId, user.id),
+      ]).catch((e) => console.error('Error transfiriendo sesión al usuario:', e));
+    }
 
     // Update last login
     await db.user.update({

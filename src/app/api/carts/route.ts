@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { upsertCart, upsertActiveCart } from "@/lib/order-cart-upsert";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,9 +19,10 @@ export async function POST(request: NextRequest) {
 
     // Obtener sessionId del header (viene del middleware)
     const sessionId = request.headers.get("x-session-id");
-    
-    // TODO: Obtener userId si está autenticado (desde sesión/token)
-    const userId: string | null = null;
+
+    // Resolver userId si el visitante tiene sesión activa
+    const currentUser = await getCurrentUser();
+    const userId = currentUser?.id ?? null;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -135,7 +137,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const sessionId = request.headers.get("x-session-id");
-    const userId: string | null = null; // TODO: Obtener de sesión autenticada
+    const currentUser = await getCurrentUser();
+    const userId = currentUser?.id ?? null;
     const cartUuid = request.nextUrl.searchParams.get("uuid");
     const cartId = request.nextUrl.searchParams.get("id");
 
@@ -157,13 +160,16 @@ export async function GET(request: NextRequest) {
     }
     // Obtener carrito activo de la sesión/usuario
     else {
+      const orConditions: Array<{ sessionId?: string | null; userId?: string; status: string }> = [];
+      if (sessionId) orConditions.push({ sessionId, status: 'activo' });
+      if (userId) orConditions.push({ userId, status: 'activo' });
+
+      if (orConditions.length === 0) {
+        return NextResponse.json({ success: false, error: "Carrito no encontrado" }, { status: 404 });
+      }
+
       cart = await db.cart.findFirst({
-        where: {
-          OR: [
-            { sessionId, status: 'activo' },
-            { userId, status: 'activo' },
-          ],
-        },
+        where: { OR: orConditions },
         include: { items: { include: { product: true } } },
       });
     }
