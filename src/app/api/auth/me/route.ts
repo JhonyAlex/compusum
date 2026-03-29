@@ -8,13 +8,18 @@ export async function GET() {
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'No autenticado' },
-        { status: 401 }
+        {
+          success: true,
+          authenticated: false,
+          data: null,
+        },
+        { status: 200 }
       );
     }
 
     return NextResponse.json({
       success: true,
+      authenticated: true,
       data: user,
     });
   } catch (error) {

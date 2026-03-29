@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
       if (userId) orConditions.push({ userId, status: 'activo' });
 
       if (orConditions.length === 0) {
-        return NextResponse.json({ success: false, error: "Carrito no encontrado" }, { status: 404 });
+        return NextResponse.json({ success: true, data: null }, { status: 200 });
       }
 
       cart = await db.cart.findFirst({
@@ -175,9 +175,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (!cart) {
+      if (cartUuid || cartId) {
+        return NextResponse.json(
+          { success: false, error: "Carrito no encontrado" },
+          { status: 404 }
+        );
+      }
+
       return NextResponse.json(
-        { success: false, error: "Carrito no encontrado" },
-        { status: 404 }
+        { success: true, data: null },
+        { status: 200 }
       );
     }
 

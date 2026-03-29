@@ -53,7 +53,11 @@ export async function sendPhoneOtp(phone: string): Promise<{ provider: 'twilio' 
   return { provider: 'twilio' };
 }
 
-export async function loginWithPhone(phone: string, otpCode: string): Promise<{ token: string; user: any }> {
+export async function loginWithPhone(
+  phone: string,
+  otpCode: string,
+  sessionDurationHours = 24
+): Promise<{ token: string; user: any }> {
   const e164Phone = toE164Phone(phone);
   const normalizedPhone = normalizePhoneInput(e164Phone);
 
@@ -82,11 +86,15 @@ export async function loginWithPhone(phone: string, otpCode: string): Promise<{ 
     });
   }
 
-  const token = await createSession(user.id);
+  const token = await createSession(user.id, sessionDurationHours);
   return { token, user };
 }
 
-export async function loginWithPassword(phoneOrEmail: string, passwordPlain: string): Promise<{ token: string; user: any }> {
+export async function loginWithPassword(
+  phoneOrEmail: string,
+  passwordPlain: string,
+  sessionDurationHours = 24
+): Promise<{ token: string; user: any }> {
   const user = await db.user.findFirst({
     where: {
       OR: [
@@ -103,6 +111,6 @@ export async function loginWithPassword(phoneOrEmail: string, passwordPlain: str
   const isValid = await verifyPassword(passwordPlain, user.password);
   if (!isValid) throw new Error("Credenciales inválidas");
 
-  const token = await createSession(user.id);
+  const token = await createSession(user.id, sessionDurationHours);
   return { token, user };
 }

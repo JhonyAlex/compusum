@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { isPhoneOtpLoginEnabled, loginWithPhone, loginWithPassword } from '@/lib/auth-dual';
-import { setSessionCookie } from '@/lib/auth';
+import {
+  setSessionCookie,
+  SESSION_DURATION_DAYS_REMEMBER_ME,
+  SESSION_DURATION_HOURS_DEFAULT,
+} from '@/lib/auth';
 
 type LoginMethod = 'phone' | 'password';
 
@@ -57,6 +61,10 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const method = (body.method as LoginMethod) || 'phone';
+    const rememberMe = Boolean(body.rememberMe);
+    const sessionHours = rememberMe
+      ? SESSION_DURATION_DAYS_REMEMBER_ME * 24
+      : SESSION_DURATION_HOURS_DEFAULT;
 
     if (method === 'phone' && !isPhoneOtpLoginEnabled()) {
       return NextResponse.json(
@@ -74,8 +82,8 @@ export async function POST(req: Request) {
         );
       }
 
-      const result = await loginWithPhone(phone, otpCode);
-      await setSessionCookie(result.token);
+      const result = await loginWithPhone(phone, otpCode, sessionHours);
+      await setSessionCookie(result.token, sessionHours * 60 * 60);
 
       return NextResponse.json({
         success: true,
@@ -91,8 +99,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await loginWithPassword(phoneOrEmail, password);
-    await setSessionCookie(result.token);
+    const result = await loginWithPassword(phoneOrEmail, password, sessionHours);
+    await setSessionCookie(result.token, sessionHours * 60 * 60);
 
     return NextResponse.json({
       success: true,

@@ -4,7 +4,8 @@ import { cookies } from 'next/headers';
 
 const SALT_ROUNDS = 10;
 const SESSION_COOKIE_NAME = 'session_token';
-const SESSION_DURATION_HOURS = 24;
+export const SESSION_DURATION_HOURS_DEFAULT = 24;
+export const SESSION_DURATION_DAYS_REMEMBER_ME = 30;
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
@@ -20,9 +21,12 @@ export function generateToken(): string {
   return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function createSession(userId: string): Promise<string> {
+export async function createSession(
+  userId: string,
+  durationHours: number = SESSION_DURATION_HOURS_DEFAULT
+): Promise<string> {
   const token = generateToken();
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_HOURS * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000);
 
   await db.session.create({
     data: { token, userId, expiresAt },
@@ -79,13 +83,16 @@ export async function getCurrentUser(): Promise<{
   };
 }
 
-export async function setSessionCookie(token: string): Promise<void> {
+export async function setSessionCookie(
+  token: string,
+  maxAgeSeconds: number = SESSION_DURATION_HOURS_DEFAULT * 60 * 60
+): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: SESSION_DURATION_HOURS * 60 * 60,
+    maxAge: maxAgeSeconds,
     path: '/',
   });
 }

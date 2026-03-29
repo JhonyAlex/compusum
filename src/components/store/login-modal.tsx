@@ -1,12 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+
+const OTP_PROGRESS_STORAGE_KEY = "compusum-login-otp-progress";
+const OTP_PROGRESS_TTL_MS = 15 * 60 * 1000;
+
+type OtpProgress = {
+  step: "otp";
+  phone: string;
+  requestedAt: number;
+  rememberMe: boolean;
+};
 
 interface LoginModalProps {
   open: boolean;
@@ -19,8 +29,59 @@ export function LoginModal({ open, onOpenChange, onLoginSuccess }: LoginModalPro
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const clearOtpProgress = () => {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(OTP_PROGRESS_STORAGE_KEY);
+  };
+
+  const persistOtpProgress = (nextPhone: string, nextRememberMe: boolean) => {
+    if (typeof window === "undefined") return;
+
+    const payload: OtpProgress = {
+      step: "otp",
+      phone: nextPhone,
+      requestedAt: Date.now(),
+      rememberMe: nextRememberMe,
+    };
+
+    window.localStorage.setItem(OTP_PROGRESS_STORAGE_KEY, JSON.stringify(payload));
+  };
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return;
+
+    const raw = window.localStorage.getItem(OTP_PROGRESS_STORAGE_KEY);
+    if (!raw) return;
+
+    try {
+      const saved = JSON.parse(raw) as OtpProgress;
+      const isValid =
+        saved?.step === "otp" &&
+        typeof saved.phone === "string" &&
+        saved.phone.length === 10 &&
+        Date.now() - saved.requestedAt < OTP_PROGRESS_TTL_MS;
+
+      if (!isValid) {
+        clearOtpProgress();
+        return;
+      }
+
+      setPhone(saved.phone);
+      setStep("otp");
+      setRememberMe(Boolean(saved.rememberMe));
+    } catch {
+      clearOtpProgress();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || step !== "otp" || phone.length !== 10) return;
+    persistOtpProgress(phone, rememberMe);
+  }, [open, phone, rememberMe, step]);
 
   const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +110,7 @@ export function LoginModal({ open, onOpenChange, onLoginSuccess }: LoginModalPro
 
       setPhone(cleaned);
       setStep("otp");
+      persistOtpProgress(cleaned, rememberMe);
 
       if (process.env.NODE_ENV !== "production" && data?.data?.debugCode) {
         setError(`En desarrollo, usá OTP: ${data.data.debugCode} para testear`);
@@ -72,6 +134,7 @@ export function LoginModal({ open, onOpenChange, onLoginSuccess }: LoginModalPro
         body: JSON.stringify({
           phone: `+57${phone}`,
           otpCode: otp,
+          rememberMe,
         }),
       });
 
@@ -84,7 +147,9 @@ export function LoginModal({ open, onOpenChange, onLoginSuccess }: LoginModalPro
       // Éxito
       setPhone("");
       setOtp("");
+      setRememberMe(false);
       setStep("phone");
+      clearOtpProgress();
       onOpenChange(false);
       if (onLoginSuccess) {
         onLoginSuccess();
@@ -98,16 +163,13 @@ export function LoginModal({ open, onOpenChange, onLoginSuccess }: LoginModalPro
     }
   };
 
-  const handleClose = () => {
-    setPhone("");
-    setOtp("");
-    setStep("phone");
+  const handleDialogOpenChange = (nextOpen: boolean) => {
     setError(null);
-    onOpenChange(false);
+    onOpenChange(nextOpen);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="sm:max-w-[420px]">
         <DialogHeader>
           <DialogTitle>Iniciar sesión con teléfono</DialogTitle>
@@ -173,12 +235,26 @@ export function LoginModal({ open, onOpenChange, onLoginSuccess }: LoginModalPro
               />
             </div>
 
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              Mantener sesión iniciada por 30 días
+            </label>
+
             <div className="flex gap-3">
               <Button
                 type="button"
                 variant="outline"
                 className="flex-1"
-                onClick={() => setStep("phone")}
+                onClick={() => {
+                  setStep("phone");
+                  setOtp("");
+                  clearOtpProgress();
+                }}
                 disabled={loading}
               >
                 Volver
