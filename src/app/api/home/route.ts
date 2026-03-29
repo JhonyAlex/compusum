@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getCachedFeaturedProducts, getCachedNewProducts, getCachedCategories, getCachedBrands } from '@/lib/product-cache';
 
 // Helper function to build category tree
 function buildCategoryTree(categories: any[], parentId: string | null = null): any[] {
@@ -17,7 +18,7 @@ export async function GET() {
   try {
     const now = new Date();
 
-    // Fetch all homepage data in parallel
+    // Fetch all homepage data in parallel (products, categories, brands use cache)
     const [
       banners,
       featuredProducts,
@@ -36,71 +37,17 @@ export async function GET() {
         orderBy: { sortOrder: 'asc' },
       }),
 
-      // Get featured products
-      db.product.findMany({
-        where: {
-          isActive: true,
-          isFeatured: true,
-        },
-        include: {
-          brand: true,
-          images: {
-            orderBy: { sortOrder: 'asc' },
-          },
-        },
-        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-        take: 8,
-      }),
+      // Get featured products (cached)
+      getCachedFeaturedProducts(),
 
-      // Get new products
-      db.product.findMany({
-        where: {
-          isActive: true,
-          isNew: true,
-        },
-        include: {
-          brand: true,
-          images: {
-            orderBy: { sortOrder: 'asc' },
-          },
-        },
-        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-        take: 8,
-      }),
+      // Get new products (cached)
+      getCachedNewProducts(),
 
-      // Get categories
-      db.category.findMany({
-        where: {
-          isActive: true,
-        },
-        include: {
-          _count: {
-            select: {
-              products: {
-                where: { isActive: true },
-              },
-            },
-          },
-        },
-        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      }),
+      // Get categories (cached)
+      getCachedCategories(),
 
-      // Get brands
-      db.brand.findMany({
-        where: {
-          isActive: true,
-        },
-        include: {
-          _count: {
-            select: {
-              products: {
-                where: { isActive: true },
-              },
-            },
-          },
-        },
-        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      }),
+      // Get brands (cached)
+      getCachedBrands(),
 
       // Get active season (by date range)
       db.season.findFirst({
@@ -163,7 +110,7 @@ export async function GET() {
       return true;
     });
 
-    // Transform categories with count
+    // Transform categories with count (cached categories already have _count)
     const categoriesWithCount = categories.map((cat) => ({
       id: cat.id,
       name: cat.name,
@@ -179,7 +126,7 @@ export async function GET() {
     // Build category tree (only top-level for homepage)
     const categoryTree = buildCategoryTree(categoriesWithCount).slice(0, 8);
 
-    // Transform brands with count
+    // Transform brands with count (cached brands already have _count)
     const brandsWithCount = brands.map((brand) => ({
       id: brand.id,
       name: brand.name,

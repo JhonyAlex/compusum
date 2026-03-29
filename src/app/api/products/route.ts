@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { searchProducts } from '@/lib/product-search';
 
 // GET /api/products - List products with filters
 export async function GET(request: Request) {
@@ -12,75 +13,47 @@ export async function GET(request: Request) {
     const featured = searchParams.get('featured');
     const isNew = searchParams.get('new');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '12');
-    const skip = (page - 1) * limit;
+    const limit = Math.min(parseInt(searchParams.get('limit') || '12'), 100);
 
-    // Build filter conditions
-    const where: any = {
-      isActive: true,
-    };
-
+    // Resolve category IDs if filtering by slug
+    let categoryIds: string[] | undefined;
     if (category) {
-      where.category = {
-        slug: category,
-      };
+      const cat = await db.category.findFirst({ where: { slug: category } });
+      if (cat) {
+        const children = await db.category.findMany({
+          where: { parentId: cat.id },
+          select: { id: true },
+        });
+        categoryIds = [cat.id, ...children.map(c => c.id)];
+      }
     }
 
+    // Resolve brand ID if filtering by slug
+    let brandId: string | undefined;
     if (brand) {
-      where.brand = {
-        slug: brand,
-      };
+      const b = await db.brand.findFirst({ where: { slug: brand } });
+      if (b) brandId = b.id;
     }
 
-    if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { description: { contains: search } },
-        { shortDescription: { contains: search } },
-        { sku: { contains: search } },
-      ];
-    }
-
-    if (featured === 'true') {
-      where.isFeatured = true;
-    }
-
-    if (isNew === 'true') {
-      where.isNew = true;
-    }
-
-    // Get products and total count
-    const [products, total] = await Promise.all([
-      db.product.findMany({
-        where,
-        include: {
-          category: true,
-          brand: true,
-          images: {
-            orderBy: { sortOrder: 'asc' },
-          },
-          seasons: {
-            include: {
-              season: true,
-            },
-          },
-        },
-        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-        skip,
-        take: limit,
-      }),
-      db.product.count({ where }),
-    ]);
+    const result = await searchProducts(search || '', {
+      limit,
+      offset: (page - 1) * limit,
+      categoryIds,
+      brandId,
+      isFeatured: featured === 'true' ? true : undefined,
+      isNew: isNew === 'true' ? true : undefined,
+      orderBy: search ? 'relevance' : 'createdAt',
+    });
 
     return NextResponse.json({
       success: true,
       data: {
-        products,
+        products: result.products,
         pagination: {
           page,
           limit,
-          total,
-          totalPages: Math.ceil(total / limit),
+          total: result.total,
+          totalPages: Math.ceil(result.total / limit),
         },
       },
     });

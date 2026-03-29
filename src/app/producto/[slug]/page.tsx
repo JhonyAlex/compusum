@@ -19,9 +19,9 @@ import {
 } from "lucide-react";
 import { ProductDetailCTA } from "@/components/store/product-detail-cta";
 import { formatPrice } from "@/lib/format";
-import { resolveCatalogMode, isGlobalCatalogModeEnabled } from "@/lib/catalog-mode";
-
-export const dynamic = "force-dynamic";
+import { resolveCatalogMode } from "@/lib/catalog-mode";
+import { getCachedProductBySlug, getCachedGlobalCatalogMode } from "@/lib/product-cache";
+import { ViewCountTracker } from "@/components/store/view-count-tracker";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -29,13 +29,10 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
-  let product: Awaited<ReturnType<typeof db.product.findUnique>> = null;
+  let product: Awaited<ReturnType<typeof getCachedProductBySlug>> = null;
 
   try {
-    product = await db.product.findUnique({
-      where: { slug },
-      include: { brand: true, category: true }
-    });
+    product = await getCachedProductBySlug(slug);
   } catch (error) {
     console.error("Product metadata query failed", error);
   }
@@ -51,19 +48,10 @@ export async function generateMetadata({ params }: PageProps) {
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
 
-  let product: Awaited<ReturnType<typeof db.product.findUnique<{ where: { slug: string }; include: { brand: true; category: { include: { parent: true } }; images: { orderBy: { sortOrder: 'asc' } } } }>>> = null;
+  let product: Awaited<ReturnType<typeof getCachedProductBySlug>> = null;
 
   try {
-    product = await db.product.findUnique({
-      where: { slug },
-      include: {
-        brand: true,
-        category: {
-          include: { parent: true }
-        },
-        images: { orderBy: { sortOrder: "asc" } }
-      }
-    });
+    product = await getCachedProductBySlug(slug);
   } catch (error) {
     console.error("Product detail query failed", error);
   }
@@ -75,7 +63,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   // Resolve catalog mode for this product
   let globalCatalogMode = false;
   try {
-    globalCatalogMode = await isGlobalCatalogModeEnabled();
+    globalCatalogMode = await getCachedGlobalCatalogMode();
   } catch (error) {
     console.error("Catalog mode check failed:", error instanceof Error ? error.message : error);
   }
@@ -104,16 +92,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
     console.error("Related products query failed", error);
   }
 
-  // Increment view count
-  try {
-    await db.product.update({
-      where: { id: product.id },
-      data: { viewsCount: { increment: 1 } }
-    });
-  } catch (error) {
-    console.error("Product view count update failed", error);
-  }
-
   const stockStatusColors = {
     disponible: "bg-green-500",
     agotado: "bg-gray-500",
@@ -129,6 +107,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Header />
+      <ViewCountTracker productId={product.id} />
       
       <main className="flex-1">
         {/* Breadcrumb */}

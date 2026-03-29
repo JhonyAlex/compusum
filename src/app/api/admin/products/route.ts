@@ -1,6 +1,106 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+
+// GET /api/admin/products - List products with server-side pagination and filters
+export async function GET(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "No autorizado" },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "25")));
+    const search = searchParams.get("search") || "";
+    const categoryId = searchParams.get("categoryId");
+    const brandId = searchParams.get("brandId");
+    const featured = searchParams.get("featured");
+    const isNew = searchParams.get("new");
+    const status = searchParams.get("status");
+    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
+
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search } },
+        { sku: { contains: search } },
+      ];
+    }
+
+    if (categoryId && categoryId !== "all") where.categoryId = categoryId;
+    if (brandId && brandId !== "all") where.brandId = brandId;
+    if (featured === "true") where.isFeatured = true;
+    if (isNew === "true") where.isNew = true;
+    if (status === "active") where.isActive = true;
+    else if (status === "inactive") where.isActive = false;
+
+    const allowedSortFields: Record<string, string> = {
+      createdAt: "createdAt",
+      name: "name",
+      price: "price",
+      sortOrder: "sortOrder",
+    };
+    const orderField = allowedSortFields[sortBy] || "createdAt";
+    const orderDir = sortOrder === "asc" ? "asc" : "desc";
+
+    const [products, total, categories, brands] = await Promise.all([
+      db.product.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          sku: true,
+          price: true,
+          wholesalePrice: true,
+          stockStatus: true,
+          isFeatured: true,
+          isNew: true,
+          isActive: true,
+          createdAt: true,
+          category: { select: { id: true, name: true } },
+          brand: { select: { id: true, name: true } },
+          images: { where: { isPrimary: true }, take: 1, select: { imagePath: true } },
+        },
+        orderBy: { [orderField]: orderDir },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.product.count({ where }),
+      db.category.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      db.brand.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        products,
+        categories,
+        brands,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching admin products:", error);
+    return NextResponse.json(
+      { success: false, error: "Error al obtener productos" },
+      { status: 500 }
+    );
+  }
+}
 
 // POST /api/admin/products - Create a new product
 export async function POST(request: Request) {
@@ -106,6 +206,11 @@ export async function POST(request: Request) {
         images: true,
       },
     });
+
+    // Invalidate product caches
+    revalidateTag("products");
+    revalidateTag("featured-products");
+    revalidateTag("new-products");
 
     return NextResponse.json({
       success: true,

@@ -3,6 +3,7 @@ import { Header } from "@/components/store/header";
 import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
 import { ProductCard } from "@/components/store/product-card";
+import { ProductInfiniteList } from "@/components/store/product-infinite-list";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
-import { isGlobalCatalogModeEnabled } from "@/lib/catalog-mode";
+import { getCachedCategories, getCachedBrands, getCachedGlobalCatalogMode } from "@/lib/product-cache";
+import { searchProducts } from "@/lib/product-search";
 import { 
   SlidersHorizontal, 
   X, 
@@ -19,8 +21,6 @@ import {
   Search,
   Package
 } from "lucide-react";
-
-export const dynamic = "force-dynamic";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -41,39 +41,26 @@ interface PageProps {
 export default async function CatalogoPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const currentPage = parseInt(params.pagina || "1");
-  let categories: Awaited<ReturnType<typeof db.category.findMany>> = [];
-  let brands: Awaited<ReturnType<typeof db.brand.findMany>> = [];
-  let products: Awaited<ReturnType<typeof db.product.findMany>> = [];
+  let categories: Awaited<ReturnType<typeof getCachedCategories>> = [];
+  let brands: Awaited<ReturnType<typeof getCachedBrands>> = [];
+  let products: any[] = [];
   let totalProducts = 0;
   let globalCatalogMode = false;
 
   try {
-    globalCatalogMode = await isGlobalCatalogModeEnabled();
+    globalCatalogMode = await getCachedGlobalCatalogMode();
   } catch (error) {
     console.error("Catalog mode check failed:", error instanceof Error ? error.message : error);
   }
 
   try {
     [categories, brands] = await Promise.all([
-      db.category.findMany({
-        where: { parentId: null, isActive: true },
-        include: {
-          children: { where: { isActive: true } },
-          _count: { select: { products: { where: { isActive: true } } } }
-        },
-        orderBy: { name: "asc" }
-      }),
-      db.brand.findMany({
-        where: { isActive: true },
-        include: {
-          _count: { select: { products: { where: { isActive: true } } } }
-        },
-        orderBy: { name: "asc" }
-      }),
+      getCachedCategories(),
+      getCachedBrands(),
     ]);
 
-    const where: Record<string, unknown> = { isActive: true };
-
+    // Resolve category IDs for filtering
+    let categoryIds: string[] | undefined;
     if (params.categoria) {
       const category = await db.category.findFirst({
         where: { slug: params.categoria }
@@ -83,62 +70,62 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
           where: { parentId: category.id },
           select: { id: true }
         });
-        const categoryIds = [category.id, ...childCategories.map(c => c.id)];
-        where.categoryId = { in: categoryIds };
+        categoryIds = [category.id, ...childCategories.map(c => c.id)];
       }
     }
 
+    // Resolve brand ID for filtering
+    let brandId: string | undefined;
     if (params.marca) {
       const brand = await db.brand.findFirst({
         where: { slug: params.marca }
       });
       if (brand) {
-        where.brandId = brand.id;
+        brandId = brand.id;
       }
     }
 
-    if (params.buscar) {
-      where.OR = [
-        { name: { contains: params.buscar } },
-        { sku: { contains: params.buscar } },
-        { description: { contains: params.buscar } }
-      ];
-    }
-
-    if (params.destacados === "true") {
-      where.isFeatured = true;
-    }
-
-    if (params.nuevo === "true") {
-      where.isNew = true;
-    }
-
-    let orderBy: Record<string, unknown>[] = [{ createdAt: "desc" }];
+    // Map sort param to search helper orderBy
+    let orderBy: "createdAt" | "name" | "name_desc" | "price_asc" | "price_desc" | "relevance" = "createdAt";
     switch (params.ordenar) {
-      case "nombre-asc":
-        orderBy = [{ name: "asc" }];
-        break;
-      case "nombre-desc":
-        orderBy = [{ name: "desc" }];
-        break;
-      case "precio-asc":
-        orderBy = [{ wholesalePrice: "asc" }];
-        break;
-      case "precio-desc":
-        orderBy = [{ wholesalePrice: "desc" }];
-        break;
+      case "nombre-asc": orderBy = "name"; break;
+      case "nombre-desc": orderBy = "name_desc"; break;
+      case "precio-asc": orderBy = "price_asc"; break;
+      case "precio-desc": orderBy = "price_desc"; break;
+      default:
+        // If there's a search query and no explicit sort, use relevance
+        if (params.buscar) orderBy = "relevance";
     }
 
-    [products, totalProducts] = await Promise.all([
-      db.product.findMany({
-        where,
-        include: { brand: true, category: true },
-        orderBy,
-        skip: (currentPage - 1) * ITEMS_PER_PAGE,
-        take: ITEMS_PER_PAGE,
-      }),
-      db.product.count({ where }),
-    ]);
+    const searchResult = await searchProducts(params.buscar || "", {
+      limit: ITEMS_PER_PAGE,
+      offset: (currentPage - 1) * ITEMS_PER_PAGE,
+      categoryIds,
+      brandId,
+      isFeatured: params.destacados === "true" ? true : undefined,
+      isNew: params.nuevo === "true" ? true : undefined,
+      orderBy,
+    });
+
+    products = searchResult.products.map(p => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      sku: p.sku,
+      price: p.price,
+      wholesalePrice: p.wholesalePrice,
+      minWholesaleQty: p.minWholesaleQty,
+      isFeatured: p.isFeatured,
+      isNew: p.isNew,
+      isActive: p.isActive,
+      catalogMode: p.catalogMode,
+      stockStatus: p.stockStatus,
+      sortOrder: p.sortOrder,
+      createdAt: p.createdAt,
+      category: p.categoryName ? { name: p.categoryName, slug: p.categorySlug!, catalogMode: p.categoryCatalogMode } : null,
+      brand: p.brandName ? { name: p.brandName, slug: p.brandSlug!, catalogMode: p.brandCatalogMode } : null,
+    }));
+    totalProducts = searchResult.total;
   } catch (error) {
     console.error("CatalogoPage query failed", error);
   }
@@ -340,80 +327,100 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
               {/* Products */}
               {products.length > 0 ? (
                 <>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6">
-                    {products.map((product) => (
-                      <ProductCard key={product.id} product={product} globalCatalogMode={globalCatalogMode} />
-                    ))}
-                  </div>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 mt-8">
-                      <Button
-                        variant="outline"
-                        disabled={currentPage === 1}
-                        asChild={currentPage > 1}
-                      >
-                        {currentPage > 1 ? (
-                          <Link href={`/catalogo?${new URLSearchParams({ ...params, pagina: String(currentPage - 1) }).toString()}`}>
-                            <ChevronLeft className="h-4 w-4" />
-                            Anterior
-                          </Link>
-                        ) : (
-                          <span>
-                            <ChevronLeft className="h-4 w-4" />
-                            Anterior
-                          </span>
-                        )}
-                      </Button>
-                      
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          let page: number;
-                          if (totalPages <= 5) {
-                            page = i + 1;
-                          } else if (currentPage <= 3) {
-                            page = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            page = totalPages - 4 + i;
-                          } else {
-                            page = currentPage - 2 + i;
-                          }
-                          
-                          return (
-                            <Link
-                              key={page}
-                              href={`/catalogo?${new URLSearchParams({ ...params, pagina: String(page) }).toString()}`}
-                              className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
-                                currentPage === page
-                                  ? "bg-[#0D4DAA] text-white"
-                                  : "bg-white hover:bg-gray-100"
-                              }`}
-                            >
-                              {page}
-                            </Link>
-                          );
-                        })}
+                  {params.buscar ? (
+                    /* Infinite scroll when searching */
+                    <ProductInfiniteList
+                      initialProducts={products}
+                      totalProducts={totalProducts}
+                      searchQuery={params.buscar}
+                      filters={{
+                        ...(params.categoria ? { category: params.categoria } : {}),
+                        ...(params.marca ? { brand: params.marca } : {}),
+                        ...(params.destacados === "true" ? { featured: "true" } : {}),
+                        ...(params.nuevo === "true" ? { new: "true" } : {}),
+                      }}
+                      globalCatalogMode={globalCatalogMode}
+                      pageSize={ITEMS_PER_PAGE}
+                    />
+                  ) : (
+                    /* Traditional pagination for browsing */
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6">
+                        {products.map((product) => (
+                          <ProductCard key={product.id} product={product} globalCatalogMode={globalCatalogMode} />
+                        ))}
                       </div>
 
-                      <Button
-                        variant="outline"
-                        disabled={currentPage === totalPages}
-                        asChild={currentPage < totalPages}
-                      >
-                        {currentPage < totalPages ? (
-                          <Link href={`/catalogo?${new URLSearchParams({ ...params, pagina: String(currentPage + 1) }).toString()}`}>
-                            Siguiente
-                            <ChevronRight className="h-4 w-4" />
-                          </Link>
-                        ) : (
-                          <span>
-                            Siguiente
-                            <ChevronRight className="h-4 w-4" />
-                          </span>
-                        )}
-                      </Button>
-                    </div>
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 mt-8">
+                          <Button
+                            variant="outline"
+                            disabled={currentPage === 1}
+                            asChild={currentPage > 1}
+                          >
+                            {currentPage > 1 ? (
+                              <Link href={`/catalogo?${new URLSearchParams({ ...params, pagina: String(currentPage - 1) }).toString()}`}>
+                                <ChevronLeft className="h-4 w-4" />
+                                Anterior
+                              </Link>
+                            ) : (
+                              <span>
+                                <ChevronLeft className="h-4 w-4" />
+                                Anterior
+                              </span>
+                            )}
+                          </Button>
+                          
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                              let page: number;
+                              if (totalPages <= 5) {
+                                page = i + 1;
+                              } else if (currentPage <= 3) {
+                                page = i + 1;
+                              } else if (currentPage >= totalPages - 2) {
+                                page = totalPages - 4 + i;
+                              } else {
+                                page = currentPage - 2 + i;
+                              }
+                              
+                              return (
+                                <Link
+                                  key={page}
+                                  href={`/catalogo?${new URLSearchParams({ ...params, pagina: String(page) }).toString()}`}
+                                  className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
+                                    currentPage === page
+                                      ? "bg-[#0D4DAA] text-white"
+                                      : "bg-white hover:bg-gray-100"
+                                  }`}
+                                >
+                                  {page}
+                                </Link>
+                              );
+                            })}
+                          </div>
+
+                          <Button
+                            variant="outline"
+                            disabled={currentPage === totalPages}
+                            asChild={currentPage < totalPages}
+                          >
+                            {currentPage < totalPages ? (
+                              <Link href={`/catalogo?${new URLSearchParams({ ...params, pagina: String(currentPage + 1) }).toString()}`}>
+                                Siguiente
+                                <ChevronRight className="h-4 w-4" />
+                              </Link>
+                            ) : (
+                              <span>
+                                Siguiente
+                                <ChevronRight className="h-4 w-4" />
+                              </span>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               ) : (

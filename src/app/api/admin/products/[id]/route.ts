@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
@@ -112,6 +113,17 @@ export async function PUT(
       },
     });
 
+    // Invalidate product caches
+    revalidateTag("products");
+    revalidateTag("featured-products");
+    revalidateTag("new-products");
+    if (existingProduct.slug) {
+      revalidateTag(`product-${existingProduct.slug}`);
+    }
+    if (slug && slug !== existingProduct.slug) {
+      revalidateTag(`product-${slug}`);
+    }
+
     return NextResponse.json({
       success: true,
       data: product,
@@ -165,6 +177,12 @@ export async function DELETE(
     await db.product.delete({
       where: { id },
     });
+
+    // Invalidate product caches
+    revalidateTag("products");
+    revalidateTag("featured-products");
+    revalidateTag("new-products");
+    revalidateTag(`product-${existingProduct.slug}`);
 
     return NextResponse.json({
       success: true,
