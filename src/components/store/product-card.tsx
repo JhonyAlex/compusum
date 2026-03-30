@@ -77,7 +77,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
               <p className="text-xs text-slate-400">{product.brand.name}</p>
             )}
             <Link href={`/producto/${product.slug}`}>
-              <h3 className="font-medium text-slate-900 text-sm line-clamp-2 hover:text-blue-600 transition-colors">
+              <h3 className="font-medium text-slate-900 text-sm line-clamp-2 hover:text-primary transition-colors">
                 {product.name}
               </h3>
             </Link>
@@ -86,7 +86,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
                 Cotizar precio
               </p>
             ) : product.wholesalePrice ? (
-              <p className="text-blue-600 font-semibold text-sm mt-1">
+              <p className="text-primary font-semibold text-sm mt-1">
                 {formatPrice(product.wholesalePrice)}
               </p>
             ) : null}
@@ -119,7 +119,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
             </Badge>
           )}
           {product.isFeatured && (
-            <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] px-2 py-0.5 font-normal">
+            <Badge className="bg-primary hover:bg-primary/90 text-white text-[10px] px-2 py-0.5 font-normal">
               Destacado
             </Badge>
           )}
@@ -138,7 +138,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
         {product.brand && (
           <Link 
             href={`/catalogo?marca=${product.brand.slug}`}
-            className="text-xs text-slate-400 hover:text-blue-600 transition-colors"
+            className="text-xs text-slate-400 hover:text-primary transition-colors"
           >
             {product.brand.name}
           </Link>
@@ -146,7 +146,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
 
         {/* Product Name */}
         <Link href={`/producto/${product.slug}`}>
-          <h3 className="font-medium text-slate-900 mt-1 line-clamp-2 hover:text-blue-600 transition-colors text-sm">
+          <h3 className="font-medium text-slate-900 mt-1 line-clamp-2 hover:text-primary transition-colors text-sm">
             {product.name}
           </h3>
         </Link>
@@ -166,7 +166,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
             </p>
           ) : product.wholesalePrice ? (
             <div>
-              <p className="text-lg font-semibold text-blue-600">
+              <p className="text-lg font-semibold text-primary">
                 {formatPrice(product.wholesalePrice)}
               </p>
               <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">

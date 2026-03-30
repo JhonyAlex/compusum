@@ -33,9 +33,9 @@ export default async function TemporadasPage() {
       
       <main className="flex-1">
         {/* Hero */}
-        <section className="bg-[#0D4DAA] text-white py-12">
+        <section className="bg-primary text-white py-12">
           <div className="container mx-auto px-4">
-            <h1 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "var(--font-fredoka)" }}>
+            <h1 className="font-heading text-3xl md:text-4xl font-bold">
               Temporadas
             </h1>
             <p className="text-white/80 mt-2">
@@ -50,7 +50,7 @@ export default async function TemporadasPage() {
             {seasons.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-xl">
                 <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold text-[#1a1a2e] mb-2">
+                <h2 className="font-heading text-xl font-semibold text-foreground mb-2">
                   No hay temporadas activas
                 </h2>
                 <p className="text-gray-500 mb-6">
@@ -82,10 +82,10 @@ export default async function TemporadasPage() {
                         />
                         <div 
                           className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"
-                          style={{ backgroundColor: season.colorHex || '#0D4DAA' }}
+                          style={{ backgroundColor: season.colorHex || 'var(--color-primary)' }}
                         />
                         <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                          <h3 className="text-xl font-bold" style={{ fontFamily: "var(--font-fredoka)" }}>
+                          <h3 className="font-heading text-xl font-bold">
                             {season.name}
                           </h3>
                         </div>

@@ -49,6 +49,33 @@
   --color-success: #25D366;
   --color-whatsapp: #25D366;
   --color-danger: #EF4444;
+  --color-text-strong: #1a1a2e;
+  --color-surface-soft: #F7EFEF;
+  --color-border-soft: #E5E7EB;
+  --color-muted-slate: #64748b;
+
+  /* ===== Semantic Theme Tokens ===== */
+  --theme-bg-page: var(--color-surface-soft);
+  --theme-bg-panel: #ffffff;
+  --theme-bg-muted: #f1f5f9;
+  --theme-text-primary: var(--color-text-strong);
+  --theme-text-muted: var(--color-muted-slate);
+  --theme-border-default: var(--color-border-soft);
+  --theme-focus-ring: rgba(13, 77, 170, 0.15);
+  --theme-primary-soft: rgba(13, 77, 170, 0.1);
+  --theme-accent-soft: rgba(232, 154, 0, 0.1);
+  --theme-success-soft: rgba(37, 211, 102, 0.1);
+
+  /* ===== Theme Gradients ===== */
+  --gradient-primary-hover: linear-gradient(135deg, #0D4DAA, #0a3d7a);
+  --gradient-accent-hover: linear-gradient(135deg, #E89A00, #C67a00);
+
+  /* ===== Motion ===== */
+  --motion-duration-fast: 150ms;
+  --motion-duration-base: 200ms;
+  --motion-duration-slow: 300ms;
+  --motion-easing-standard: ease;
+  --motion-easing-emphasis: ease-out;
 
   /* ===== shadcn/ui Theme Variables ===== */
   --background: 0 0% 100%;
@@ -110,8 +137,8 @@
   --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15);
   
   /* ===== Transitions ===== */
-  --transition-fast: 150ms ease;
-  --transition-base: 200ms ease;
+  --transition-fast: var(--motion-duration-fast) var(--motion-easing-standard);
+  --transition-base: var(--motion-duration-base) var(--motion-easing-standard);
 }
 
 /* ============================================
@@ -120,54 +147,54 @@
 
 /* Buttons - Using plain CSS for better compatibility */
 .btn-primary {
-  background-color: #0D4DAA;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--theme-bg-panel);
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  transition: all 200ms ease;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
   border: none;
   cursor: pointer;
 }
 .btn-primary:hover {
-  background: linear-gradient(135deg, #0D4DAA, #0a3d7a);
+  background: var(--gradient-primary-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(13, 77, 170, 0.25);
 }
 
 .btn-secondary {
-  background-color: #F7EFEF;
-  color: #1a1a2e;
+  background-color: var(--color-secondary);
+  color: var(--theme-text-primary);
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid #E5E7EB;
-  transition: all 200ms ease;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--theme-border-default);
+  transition: all var(--transition-base);
 }
 .btn-secondary:hover {
-  background-color: #E5E7EB;
-  border-color: #0D4DAA;
+  background-color: var(--theme-border-default);
+  border-color: var(--color-primary);
 }
 
 .btn-accent {
-  background-color: #E89A00;
-  color: white;
+  background-color: var(--color-accent);
+  color: var(--theme-bg-panel);
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  transition: all 200ms ease;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
 }
 .btn-accent:hover {
-  background: linear-gradient(135deg, #E89A00, #C67a00);
+  background: var(--gradient-accent-hover);
 }
 
 .btn-whatsapp {
-  background-color: #25D366;
-  color: white;
+  background-color: var(--color-whatsapp);
+  color: var(--theme-bg-panel);
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  transition: all 200ms ease;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
 }
 .btn-whatsapp:hover {
   background-color: #1da851;
@@ -175,30 +202,30 @@
 
 .btn-outline-primary {
   background-color: transparent;
-  border: 2px solid #0D4DAA;
-  color: #0D4DAA;
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  transition: all 200ms ease;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
 }
 .btn-outline-primary:hover {
-  background-color: #0D4DAA;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--theme-bg-panel);
 }
 
 .btn-outline-accent {
   background-color: transparent;
-  border: 2px solid #E89A00;
-  color: #E89A00;
+  border: 2px solid var(--color-accent);
+  color: var(--color-accent);
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  transition: all 200ms ease;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
 }
 .btn-outline-accent:hover {
-  background-color: #E89A00;
-  color: white;
+  background-color: var(--color-accent);
+  color: var(--theme-bg-panel);
 }
 
 /* Button Sizes */
@@ -217,13 +244,13 @@
 
 /* Cards */
 .card {
-  background-color: white;
-  border-radius: 0.75rem;
-  border: 1px solid #E5E7EB;
+  background-color: var(--theme-bg-panel);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--theme-border-default);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 .card-hover {
-  transition: box-shadow 200ms ease, border-color 200ms ease;
+  transition: box-shadow var(--transition-base), border-color var(--transition-base);
 }
 .card-hover:hover {
   box-shadow: var(--shadow-lg);
@@ -232,51 +259,59 @@
 
 /* Badges */
 .badge-primary {
-  background-color: rgba(13, 77, 170, 0.1);
-  color: #0D4DAA;
+  background-color: var(--theme-primary-soft);
+  color: var(--color-primary);
   font-size: 0.75rem;
   font-weight: 500;
   padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 .badge-accent {
-  background-color: rgba(232, 154, 0, 0.1);
-  color: #E89A00;
+  background-color: var(--theme-accent-soft);
+  color: var(--color-accent);
   font-size: 0.75rem;
   font-weight: 500;
   padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 .badge-success {
-  background-color: rgba(37, 211, 102, 0.1);
-  color: #25D366;
+  background-color: var(--theme-success-soft);
+  color: var(--color-success);
   font-size: 0.75rem;
   font-weight: 500;
   padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 .badge-outline {
   background-color: transparent;
-  border: 1px solid #CBD5E1;
-  color: #475569;
+  border: 1px solid var(--theme-border-default);
+  color: var(--theme-text-muted);
   font-size: 0.75rem;
   font-weight: 500;
   padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 
 /* Inputs */
 .input {
   width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #CBD5E1;
-  border-radius: 0.5rem;
-  transition: all 200ms ease;
+  border: 1px solid var(--theme-border-default);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
   outline: none;
 }
 .input:focus {
-  border-color: #0D4DAA;
-  box-shadow: 0 0 0 3px rgba(13, 77, 170, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--theme-focus-ring);
+}
+
+.font-heading {
+  font-family: var(--font-fredoka), var(--font-heading);
+}
+
+.font-body {
+  font-family: var(--font-poppins), var(--font-body);
 }
 
 /* Section Headers */
@@ -482,6 +517,18 @@
   opacity: 0.05;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
+
+.hero-grid-overlay {
+  background-image:
+    linear-gradient(hsl(0 0% 100% / 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(0 0% 100% / 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+.radial-primary-soft {
+  background: radial-gradient(circle at 50% 50%, hsl(var(--primary) / 0.08), transparent 70%);
+}
+
 .hero-content {
   position: relative;
   z-index: 10;

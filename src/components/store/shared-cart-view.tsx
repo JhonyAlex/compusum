@@ -127,10 +127,7 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
         <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
           <ShoppingCart className="h-7 w-7 text-blue-600" />
         </div>
-        <h1
-          className="text-2xl md:text-3xl font-bold text-slate-900"
-          style={{ fontFamily: "var(--font-fredoka)" }}
-        >
+        <h1 className="font-heading text-2xl md:text-3xl font-bold text-slate-900">
           Carrito compartido
         </h1>
         {cart.customerName && (

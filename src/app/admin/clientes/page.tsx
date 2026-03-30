@@ -172,7 +172,12 @@ export default async function AdminClientesPage({ searchParams }: Props) {
         ) : (
           <div className="space-y-3">
             {paginated.map((customer) => (
-              <Card key={customer.key} className="hover:border-blue-200 transition-colors">
+              <Link
+                key={customer.key}
+                href={`/admin/clientes/${encodeURIComponent(customer.key)}`}
+                className="block"
+              >
+              <Card className="hover:border-blue-200 transition-colors">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -235,6 +240,7 @@ export default async function AdminClientesPage({ searchParams }: Props) {
                   </div>
                 </CardContent>
               </Card>
+              </Link>
             ))}
           </div>
         )}

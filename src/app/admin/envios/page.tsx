@@ -247,6 +247,81 @@ export default async function AdminEnviosPage({
     redirect("/admin/envios?ok=city-updated");
   }
 
+  async function deleteRoute(formData: FormData) {
+    "use server";
+
+    const id = String(formData.get("id") || "").trim();
+    if (!id) redirect("/admin/envios?error=route-delete-invalid");
+
+    // Check if route has cities assigned
+    const citiesCount = await db.city.count({ where: { shippingRouteId: id } });
+    if (citiesCount > 0) {
+      redirect("/admin/envios?error=route-has-cities");
+    }
+
+    // Check if route has orders assigned
+    const ordersCount = await db.order.count({ where: { routeId: id } });
+    if (ordersCount > 0) {
+      redirect("/admin/envios?error=route-has-orders");
+    }
+
+    await db.shippingRoute.delete({ where: { id } });
+
+    revalidatePath("/admin/envios");
+    revalidatePath("/api/shipping/cities");
+    redirect("/admin/envios?ok=route-deleted");
+  }
+
+  async function duplicateRoute(formData: FormData) {
+    "use server";
+
+    const id = String(formData.get("id") || "").trim();
+    if (!id) redirect("/admin/envios?error=route-duplicate-invalid");
+
+    const source = await db.shippingRoute.findUnique({ where: { id } });
+    if (!source) redirect("/admin/envios?error=route-not-found");
+
+    await db.shippingRoute.create({
+      data: {
+        name: `${source.name} (copia)`,
+        estimatedDaysMin: source.estimatedDaysMin,
+        estimatedDaysMax: source.estimatedDaysMax,
+        shippingCompany: source.shippingCompany,
+        notes: source.notes,
+        sortOrder: source.sortOrder,
+        cutOffTime: source.cutOffTime,
+        departureDaysOfWeek: source.departureDaysOfWeek,
+        isActive: false,
+      },
+    });
+
+    revalidatePath("/admin/envios");
+    redirect("/admin/envios?ok=route-duplicated");
+  }
+
+  async function deleteCity(formData: FormData) {
+    "use server";
+
+    const id = String(formData.get("id") || "").trim();
+    if (!id) redirect("/admin/envios?error=city-delete-invalid");
+
+    // Check if city has carts or orders assigned
+    const [cartsCount, ordersCount] = await Promise.all([
+      db.cart.count({ where: { cityId: id } }),
+      db.order.count({ where: { cityId: id } }),
+    ]);
+
+    if (cartsCount > 0 || ordersCount > 0) {
+      redirect("/admin/envios?error=city-has-references");
+    }
+
+    await db.city.delete({ where: { id } });
+
+    revalidatePath("/admin/envios");
+    revalidatePath("/api/shipping/cities");
+    redirect("/admin/envios?ok=city-deleted");
+  }
+
   return (
     <div>
       <Header title="Envíos" subtitle="Gestiona rutas, departamentos y ciudades" />
@@ -260,7 +335,13 @@ export default async function AdminEnviosPage({
 
         {params.error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            Hubo un error validando los datos. Revisa los campos e intenta de nuevo.
+            {params.error === "route-has-cities"
+              ? "No se puede eliminar la ruta porque tiene ciudades asignadas. Reasigna las ciudades primero."
+              : params.error === "route-has-orders"
+              ? "No se puede eliminar la ruta porque tiene pedidos asociados."
+              : params.error === "city-has-references"
+              ? "No se puede eliminar la ciudad porque tiene carritos o pedidos asociados."
+              : "Hubo un error validando los datos. Revisa los campos e intenta de nuevo."}
           </div>
         )}
 
@@ -486,9 +567,23 @@ export default async function AdminEnviosPage({
                     <Input name="sortOrder" type="number" min={0} defaultValue={route.sortOrder} className="w-20" />
                   </div>
 
-                  <Button type="submit" className="w-full md:w-auto">
-                    Actualizar ruta
-                  </Button>
+                  <div className="flex items-end gap-2">
+                    <Button type="submit" className="w-full md:w-auto">
+                      Actualizar ruta
+                    </Button>
+                    <form action={duplicateRoute}>
+                      <input type="hidden" name="id" value={route.id} />
+                      <Button type="submit" variant="outline" size="sm" title="Duplicar ruta">
+                        Duplicar
+                      </Button>
+                    </form>
+                    <form action={deleteRoute}>
+                      <input type="hidden" name="id" value={route.id} />
+                      <Button type="submit" variant="destructive" size="sm" title="Eliminar ruta">
+                        Eliminar
+                      </Button>
+                    </form>
+                  </div>
                 </div>
               </form>
             ))}
@@ -540,8 +635,17 @@ export default async function AdminEnviosPage({
                   <span className="text-sm">Activa</span>
                 </div>
 
+                <div className="flex gap-2">
+                  <Button type="submit" className="flex-1">Guardar</Button>
+                </div>
+
                 <div>
-                  <Button type="submit" className="w-full">Guardar</Button>
+                  <form action={deleteCity}>
+                    <input type="hidden" name="id" value={city.id} />
+                    <Button type="submit" variant="destructive" size="sm" className="w-full" title="Eliminar ciudad">
+                      Eliminar
+                    </Button>
+                  </form>
                 </div>
               </form>
             ))}

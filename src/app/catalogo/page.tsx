@@ -137,14 +137,14 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
   const currentBrand = brands.find(b => b.slug === params.marca);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F7EFEF]">
+    <div className="min-h-screen flex flex-col bg-secondary">
       <Header />
       
       <main className="flex-1">
         {/* Page Header */}
-        <section className="bg-[#0D4DAA] text-white py-8 md:py-12">
+        <section className="bg-primary text-white py-8 md:py-12">
           <div className="container mx-auto px-4">
-            <h1 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "var(--font-fredoka)" }}>
+            <h1 className="font-heading text-3xl md:text-4xl font-bold">
               Catálogo de Productos
             </h1>
             <p className="text-white/80 mt-2">
@@ -159,7 +159,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
             <aside className="w-full lg:w-64 flex-shrink-0">
               <div className="bg-white rounded-xl shadow-sm p-6 sticky top-24">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-bold text-lg" style={{ fontFamily: "var(--font-fredoka)" }}>
+                  <h2 className="font-heading font-bold text-lg">
                     Filtros
                   </h2>
                   <SlidersHorizontal className="h-5 w-5 text-gray-400" />
@@ -170,7 +170,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-gray-500">Filtros activos:</span>
-                      <Link href="/catalogo" className="text-sm text-[#0D4DAA] hover:underline">
+                      <Link href="/catalogo" className="text-sm text-primary hover:underline">
                         Limpiar
                       </Link>
                     </div>
@@ -238,7 +238,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
                         href={`/catalogo?categoria=${category.slug}`}
                         className={`flex items-center justify-between py-1.5 px-2 rounded-lg text-sm transition-colors ${
                           params.categoria === category.slug
-                            ? "bg-[#0D4DAA] text-white"
+                            ? "bg-primary text-white"
                             : "hover:bg-gray-100"
                         }`}
                       >
@@ -262,7 +262,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
                         href={`/catalogo?marca=${brand.slug}`}
                         className={`flex items-center justify-between py-1.5 px-2 rounded-lg text-sm transition-colors ${
                           params.marca === brand.slug
-                            ? "bg-[#0D4DAA] text-white"
+                            ? "bg-primary text-white"
                             : "hover:bg-gray-100"
                         }`}
                       >
@@ -280,8 +280,8 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
                     href="/catalogo?destacados=true"
                     className={`block py-2 px-3 rounded-lg text-sm transition-colors ${
                       params.destacados === "true"
-                        ? "bg-[#E89A00] text-white"
-                        : "bg-[#E89A00]/10 text-[#E89A00] hover:bg-[#E89A00]/20"
+                        ? "bg-accent text-white"
+                        : "bg-accent/10 text-accent hover:bg-accent/20"
                     }`}
                   >
                     ⭐ Productos destacados
@@ -305,7 +305,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
               {/* Sort & Results Count */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 bg-white rounded-xl shadow-sm p-4">
                 <p className="text-gray-500">
-                  <span className="font-semibold text-[#1a1a2e]">{totalProducts}</span> productos encontrados
+                  <span className="font-semibold text-foreground">{totalProducts}</span> productos encontrados
                 </p>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500">Ordenar por:</span>
@@ -391,7 +391,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
                                   href={`/catalogo?${new URLSearchParams({ ...params, pagina: String(page) }).toString()}`}
                                   className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
                                     currentPage === page
-                                      ? "bg-[#0D4DAA] text-white"
+                                      ? "bg-primary text-white"
                                       : "bg-white hover:bg-gray-100"
                                   }`}
                                 >
@@ -426,7 +426,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
               ) : (
                 <div className="bg-white rounded-xl shadow-sm p-12 text-center">
                   <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-[#1a1a2e] mb-2">
+                  <h3 className="font-heading text-xl font-semibold text-foreground mb-2">
                     No se encontraron productos
                   </h3>
                   <p className="text-gray-500 mb-6">

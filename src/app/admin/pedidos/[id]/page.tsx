@@ -130,6 +130,10 @@ export default async function AdminOrderDetailPage({ params }: Props) {
             currentStatus={order.status}
             currentNotes={order.notes || ""}
             webhookSent={order.webhookSent}
+            customerName={order.customerName}
+            customerEmail={order.customerEmail}
+            customerPhone={order.customerPhone}
+            customerCompany={order.customerCompany}
           />
         </div>
 

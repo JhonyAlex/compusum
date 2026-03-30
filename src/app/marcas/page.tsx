@@ -19,11 +19,11 @@ type BrandWithCount = {
 
 // Featured brands for hero section
 const featuredBrands = [
-  { name: "Faber-Castell", color: "#4CAF50" },
-  { name: "Staedtler", color: "#E53935" },
-  { name: "BIC", color: "#FFB300" },
-  { name: "Sharpie", color: "#1565C0" },
-  { name: "Crayola", color: "#7B1FA2" },
+  { name: "Faber-Castell", colorClass: "bg-emerald-500" },
+  { name: "Staedtler", colorClass: "bg-rose-600" },
+  { name: "BIC", colorClass: "bg-amber-500" },
+  { name: "Sharpie", colorClass: "bg-blue-600" },
+  { name: "Crayola", colorClass: "bg-violet-700" },
 ];
 
 export default async function MarcasPage() {
@@ -49,39 +49,31 @@ export default async function MarcasPage() {
       
       <main className="flex-1">
         {/* Hero Section - Modern Gradient with Floating Elements */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-[#0D4DAA] via-[#0A3D8A] to-[#062D6A] text-white">
+        <section className="brands-hero-gradient relative overflow-hidden text-white">
           {/* Animated Background Elements */}
           <div className="absolute inset-0 overflow-hidden">
             {/* Floating Circles */}
             <div className="absolute top-20 left-10 w-64 h-64 bg-white/5 rounded-full blur-3xl animate-float-slow" />
-            <div className="absolute bottom-10 right-20 w-96 h-96 bg-[#E89A00]/10 rounded-full blur-3xl animate-float-medium" />
+            <div className="absolute bottom-10 right-20 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float-medium" />
             <div className="absolute top-1/2 left-1/3 w-48 h-48 bg-white/5 rounded-full blur-2xl animate-float-fast" />
             
             {/* Grid Pattern Overlay */}
-            <div 
-              className="absolute inset-0 opacity-[0.03]"
-              style={{
-                backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                                  linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-                backgroundSize: '50px 50px'
-              }}
-            />
+            <div className="hero-grid-overlay absolute inset-0 opacity-[0.03]" />
           </div>
 
           <div className="container mx-auto px-4 py-16 md:py-24 relative z-10">
             <div className="max-w-4xl mx-auto text-center">
               {/* Badge */}
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6 animate-fade-in-up">
-                <span className="w-2 h-2 bg-[#E89A00] rounded-full animate-pulse" />
+                <span className="w-2 h-2 bg-accent rounded-full animate-pulse" />
                 <span className="text-sm font-medium text-white/90">Distribuidor autorizado</span>
               </div>
 
               {/* Main Title */}
               <h1 
-                className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 animate-fade-in-up animation-delay-100"
-                style={{ fontFamily: "var(--font-fredoka)" }}
+                className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold mb-6 animate-fade-in-up animation-delay-100"
               >
-                Nuestras <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#E89A00] to-[#FFB74D]">Marcas</span>
+                Nuestras <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-amber-300">Marcas</span>
               </h1>
 
               {/* Subtitle */}
@@ -93,21 +85,21 @@ export default async function MarcasPage() {
               {/* Stats */}
               <div className="flex flex-wrap justify-center gap-8 md:gap-12 animate-fade-in-up animation-delay-300">
                 <div className="text-center">
-                  <div className="text-3xl md:text-4xl font-bold text-white" style={{ fontFamily: "var(--font-fredoka)" }}>
+                  <div className="font-heading text-3xl md:text-4xl font-bold text-white">
                     {brands.length}+
                   </div>
                   <div className="text-sm text-white/60 mt-1">Marcas</div>
                 </div>
                 <div className="w-px h-12 bg-white/20 hidden md:block" />
                 <div className="text-center">
-                  <div className="text-3xl md:text-4xl font-bold text-white" style={{ fontFamily: "var(--font-fredoka)" }}>
+                  <div className="font-heading text-3xl md:text-4xl font-bold text-white">
                     {totalProducts}+
                   </div>
                   <div className="text-sm text-white/60 mt-1">Productos</div>
                 </div>
                 <div className="w-px h-12 bg-white/20 hidden md:block" />
                 <div className="text-center">
-                  <div className="text-3xl md:text-4xl font-bold text-white" style={{ fontFamily: "var(--font-fredoka)" }}>
+                  <div className="font-heading text-3xl md:text-4xl font-bold text-white">
                     15+
                   </div>
                   <div className="text-sm text-white/60 mt-1">Años de experiencia</div>
@@ -136,8 +128,7 @@ export default async function MarcasPage() {
                 className="flex items-center gap-2 px-6 py-2 bg-gray-50 rounded-full whitespace-nowrap"
               >
                 <span 
-                  className="w-3 h-3 rounded-full" 
-                  style={{ backgroundColor: brand.color }}
+                  className={`w-3 h-3 rounded-full ${brand.colorClass}`}
                 />
                 <span className="text-sm font-medium text-gray-700">{brand.name}</span>
               </div>
@@ -151,8 +142,7 @@ export default async function MarcasPage() {
             {/* Section Header */}
             <div className="text-center mb-12">
               <h2 
-                className="text-2xl md:text-3xl font-bold text-gray-900 mb-4"
-                style={{ fontFamily: "var(--font-fredoka)" }}
+                className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-4"
               >
                 Explora nuestras marcas
               </h2>
@@ -173,12 +163,12 @@ export default async function MarcasPage() {
                   {/* Card Container */}
                   <div className="relative bg-white rounded-2xl overflow-hidden border border-gray-100 
                                   transition-all duration-500 ease-out
-                                  hover:border-[#0D4DAA]/30 hover:shadow-xl hover:shadow-[#0D4DAA]/10
+                                  hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10
                                   hover:-translate-y-1 group-hover:scale-[1.02]">
                     
                     {/* Gradient Overlay on Hover */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#0D4DAA]/0 to-[#E89A00]/0 
-                                    group-hover:from-[#0D4DAA]/5 group-hover:to-[#E89A00]/5 
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-accent/0 
+                                    group-hover:from-primary/5 group-hover:to-accent/5 
                                     transition-all duration-500 rounded-2xl" />
 
                     {/* Logo Container */}
@@ -186,7 +176,7 @@ export default async function MarcasPage() {
                                     flex items-center justify-center p-6 md:p-8 overflow-hidden">
                       {/* Background Pattern */}
                       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(13,77,170,0.05),transparent_70%)]" />
+                        <div className="radial-primary-soft absolute inset-0" />
                       </div>
 
                       {/* Logo Image */}
@@ -212,18 +202,18 @@ export default async function MarcasPage() {
                     <div className="relative px-4 py-4 bg-white border-t border-gray-50">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-semibold text-gray-900 group-hover:text-[#0D4DAA] 
+                          <h3 className="font-semibold text-gray-900 group-hover:text-primary 
                                          transition-colors duration-300 truncate text-sm md:text-base">
                             {brand.name}
                           </h3>
                           <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-[#E89A00] rounded-full" />
+                            <span className="w-1.5 h-1.5 bg-accent rounded-full" />
                             {brand._count.products} productos
                           </p>
                         </div>
                         
                         {/* Arrow Icon */}
-                        <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-[#0D4DAA] 
+                        <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-primary 
                                         flex items-center justify-center
                                         transition-all duration-300 transform group-hover:translate-x-1">
                           <svg 
@@ -250,7 +240,7 @@ export default async function MarcasPage() {
             <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
               {/* Trust Card 1 */}
               <div className="text-center p-6 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-gradient-to-br from-[#0D4DAA] to-[#0A3D8A] 
+                <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-gradient-to-br from-primary to-blue-800 
                                 flex items-center justify-center text-white">
                   <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} 
@@ -263,7 +253,7 @@ export default async function MarcasPage() {
 
               {/* Trust Card 2 */}
               <div className="text-center p-6 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-gradient-to-br from-[#E89A00] to-[#C67A00] 
+                <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-gradient-to-br from-accent to-amber-700 
                                 flex items-center justify-center text-white">
                   <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} 
@@ -276,7 +266,7 @@ export default async function MarcasPage() {
 
               {/* Trust Card 3 */}
               <div className="text-center p-6 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-gradient-to-br from-[#25D366] to-[#1DA851] 
+                <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-gradient-to-br from-green-500 to-green-600 
                                 flex items-center justify-center text-white">
                   <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} 
@@ -293,17 +283,17 @@ export default async function MarcasPage() {
         {/* CTA Section - Modern Design */}
         <section className="relative py-20 overflow-hidden">
           {/* Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#F7EFEF] via-white to-[#FFF8F0]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-secondary via-white to-amber-50" />
           
           {/* Decorative Elements */}
-          <div className="absolute top-10 left-10 w-32 h-32 bg-[#0D4DAA]/5 rounded-full blur-2xl" />
-          <div className="absolute bottom-10 right-10 w-48 h-48 bg-[#E89A00]/10 rounded-full blur-3xl" />
+          <div className="absolute top-10 left-10 w-32 h-32 bg-primary/5 rounded-full blur-2xl" />
+          <div className="absolute bottom-10 right-10 w-48 h-48 bg-accent/10 rounded-full blur-3xl" />
           
           <div className="container mx-auto px-4 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
               {/* Icon */}
-              <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#0D4DAA] to-[#0A3D8A] 
-                              flex items-center justify-center text-white shadow-lg shadow-[#0D4DAA]/25">
+              <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-blue-800 
+                              flex items-center justify-center text-white shadow-lg shadow-primary/25">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} 
                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -311,8 +301,7 @@ export default async function MarcasPage() {
               </div>
 
               <h2 
-                className="text-2xl md:text-4xl font-bold text-gray-900 mb-4"
-                style={{ fontFamily: "var(--font-fredoka)" }}
+                className="font-heading text-2xl md:text-4xl font-bold text-foreground mb-4"
               >
                 ¿Buscas una marca específica?
               </h2>
@@ -324,8 +313,8 @@ export default async function MarcasPage() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button 
                   asChild 
-                  className="bg-[#0D4DAA] hover:bg-[#0A3D8A] text-white px-8 py-6 text-lg
-                             shadow-lg shadow-[#0D4DAA]/25 hover:shadow-xl hover:shadow-[#0D4DAA]/30
+                  className="bg-primary hover:bg-primary/90 text-white px-8 py-6 text-lg
+                             shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30
                              transition-all duration-300 hover:-translate-y-0.5"
                 >
                   <Link href="/contacto" className="flex items-center gap-2">
@@ -340,7 +329,7 @@ export default async function MarcasPage() {
                 <Button 
                   asChild 
                   variant="outline"
-                  className="border-2 border-[#0D4DAA] text-[#0D4DAA] hover:bg-[#0D4DAA] hover:text-white
+                  className="border-2 border-primary text-primary hover:bg-primary hover:text-white
                              px-8 py-6 text-lg transition-all duration-300"
                 >
                   <Link href="/catalogo" className="flex items-center gap-2">

@@ -43,11 +43,11 @@ export default function MayoristasPage() {
       
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative bg-gradient-to-r from-[#0D4DAA] to-[#1E3A5F] text-white py-16 md:py-24">
+        <section className="relative bg-gradient-to-r from-primary to-blue-900 text-white py-16 md:py-24">
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-6" style={{ fontFamily: "var(--font-fredoka)" }}>
+                <h1 className="font-heading text-4xl md:text-5xl font-bold mb-6">
                   ¿Eres mayorista?
                 </h1>
                 <p className="text-lg text-white/80 mb-8">
@@ -55,13 +55,13 @@ export default function MayoristasPage() {
                   Manejamos precios especiales para tiendas, colegios, empresas e instituciones.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Button asChild size="lg" className="bg-[#25D366] hover:bg-[#20BA5A] text-white gap-2">
+                  <Button asChild size="lg" className="bg-green-500 hover:bg-green-600 text-white gap-2">
                     <a href="https://wa.me/576063335206?text=Hola%2C%20soy%20mayorista%20y%20quiero%20cotizar" target="_blank" rel="noopener noreferrer">
                       <MessageCircle className="h-5 w-5" />
                       Cotizar por WhatsApp
                     </a>
                   </Button>
-                  <Button asChild size="lg" variant="outline" className="border-white text-white bg-transparent hover:bg-white hover:text-[#0D4DAA]">
+                  <Button asChild size="lg" variant="outline" className="border-white text-white bg-transparent hover:bg-white hover:text-primary">
                     <Link href="/catalogo">Ver catálogo</Link>
                   </Button>
                 </div>
@@ -84,12 +84,12 @@ export default function MayoristasPage() {
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {benefits.map((benefit, index) => (
-                <div key={index} className="flex items-start gap-4 p-6 bg-[#F7EFEF] rounded-xl">
-                  <div className="bg-[#0D4DAA] p-3 rounded-lg flex-shrink-0">
+                <div key={index} className="flex items-start gap-4 p-6 bg-secondary rounded-xl">
+                  <div className="bg-primary p-3 rounded-lg flex-shrink-0">
                     <benefit.icon className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-[#1a1a2e]">{benefit.title}</h3>
+                    <h3 className="font-semibold text-foreground">{benefit.title}</h3>
                     <p className="text-sm text-gray-500 mt-1">{benefit.description}</p>
                   </div>
                 </div>
@@ -99,10 +99,10 @@ export default function MayoristasPage() {
         </section>
 
         {/* How to Buy */}
-        <section className="py-16 bg-[#F7EFEF]">
+        <section className="py-16 bg-secondary">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e]" style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h2 className="font-heading text-3xl md:text-4xl font-bold text-foreground">
                 ¿Cómo comprar?
               </h2>
               <p className="text-gray-500 mt-2">Proceso simple y rápido para mayoristas</p>
@@ -110,13 +110,13 @@ export default function MayoristasPage() {
             <div className="grid md:grid-cols-4 gap-8">
               {steps.map((step, index) => (
                 <div key={index} className="relative text-center">
-                  <div className="w-16 h-16 bg-[#E89A00] text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4" style={{ fontFamily: "var(--font-fredoka)" }}>
+                  <div className="font-heading w-16 h-16 bg-accent text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                     {step.number}
                   </div>
-                  <h3 className="font-semibold text-[#1a1a2e] mb-2">{step.title}</h3>
+                  <h3 className="font-semibold text-foreground mb-2">{step.title}</h3>
                   <p className="text-sm text-gray-500">{step.description}</p>
                   {index < 3 && (
-                    <div className="hidden md:block absolute top-8 left-[60%] w-[80%] border-t-2 border-dashed border-[#E89A00]/30" />
+                    <div className="hidden md:block absolute top-8 left-[60%] w-[80%] border-t-2 border-dashed border-accent/30" />
                   )}
                 </div>
               ))}
@@ -128,19 +128,19 @@ export default function MayoristasPage() {
         <section className="py-16 bg-white">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e]" style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h2 className="font-heading text-3xl md:text-4xl font-bold text-foreground">
                 Zonas de envío
               </h2>
               <p className="text-gray-500 mt-2">Llegamos a las principales ciudades de Colombia</p>
             </div>
             <div className="flex flex-wrap justify-center gap-3">
               {cities.map((city, index) => (
-                <div key={index} className="bg-[#0D4DAA]/10 text-[#0D4DAA] px-4 py-2 rounded-full text-sm font-medium">
+                <div key={index} className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium">
                   <MapPin className="h-4 w-4 inline mr-1" />
                   {city}
                 </div>
               ))}
-              <div className="bg-[#E89A00] text-white px-4 py-2 rounded-full text-sm font-medium">
+              <div className="bg-accent text-white px-4 py-2 rounded-full text-sm font-medium">
                 ¡Y más ciudades!
               </div>
             </div>
@@ -148,9 +148,9 @@ export default function MayoristasPage() {
         </section>
 
         {/* CTA */}
-        <section className="py-16 bg-[#0D4DAA] text-white">
+        <section className="py-16 bg-primary text-white">
           <div className="container mx-auto px-4 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: "var(--font-fredoka)" }}>
+            <h2 className="font-heading text-3xl md:text-4xl font-bold mb-6">
               ¿Listo para hacer tu pedido mayorista?
             </h2>
             <p className="text-white/80 text-lg max-w-2xl mx-auto mb-8">
@@ -159,7 +159,7 @@ export default function MayoristasPage() {
             <Button
               asChild
               size="lg"
-              className="bg-[#25D366] hover:bg-[#20BA5A] text-white gap-2 text-lg px-8"
+              className="bg-green-500 hover:bg-green-600 text-white gap-2 text-lg px-8"
             >
               <a href="https://wa.me/576063335206?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20ventas%20por%20mayor" target="_blank" rel="noopener noreferrer">
                 <MessageCircle className="h-6 w-6" />

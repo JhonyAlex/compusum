@@ -27,18 +27,18 @@ export default function NosotrosPage() {
       
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative bg-gradient-to-r from-[#0D4DAA] to-[#1E3A5F] text-white py-16 md:py-24">
+        <section className="relative bg-gradient-to-r from-primary to-blue-900 text-white py-16 md:py-24">
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-6" style={{ fontFamily: "var(--font-fredoka)" }}>
+                <h1 className="font-heading text-4xl md:text-5xl font-bold mb-6">
                   Sobre Compusum
                 </h1>
                 <p className="text-lg text-white/80 mb-8">
                   Somos una empresa pereirana con más de 20 años de experiencia en el sector de la papelería mayorista. 
                   Nos especializamos en la distribución de útiles escolares y de oficina de las mejores marcas del mercado.
                 </p>
-                <Button asChild size="lg" className="bg-[#E89A00] hover:bg-[#D68A00] text-white">
+                <Button asChild size="lg" className="bg-accent hover:bg-accent/90 text-white">
                   <Link href="/contacto">Contáctanos</Link>
                 </Button>
               </div>
@@ -61,7 +61,7 @@ export default function NosotrosPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               {stats.map((stat, index) => (
                 <div key={index} className="text-center">
-                  <p className="text-4xl md:text-5xl font-bold text-[#0D4DAA]" style={{ fontFamily: "var(--font-fredoka)" }}>
+                  <p className="font-heading text-4xl md:text-5xl font-bold text-primary">
                     {stat.value}
                   </p>
                   <p className="text-gray-500 mt-2">{stat.label}</p>
@@ -72,14 +72,14 @@ export default function NosotrosPage() {
         </section>
 
         {/* Mission & Vision */}
-        <section className="py-16 bg-[#F7EFEF]">
+        <section className="py-16 bg-secondary">
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-2 gap-8">
               <div className="bg-white p-8 rounded-2xl shadow-sm">
-                <div className="bg-[#0D4DAA] w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                <div className="bg-primary w-12 h-12 rounded-lg flex items-center justify-center mb-4">
                   <Target className="h-6 w-6 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-[#1a1a2e] mb-4" style={{ fontFamily: "var(--font-fredoka)" }}>
+                <h3 className="font-heading text-2xl font-bold text-foreground mb-4">
                   Misión
                 </h3>
                 <p className="text-gray-600">
@@ -89,10 +89,10 @@ export default function NosotrosPage() {
                 </p>
               </div>
               <div className="bg-white p-8 rounded-2xl shadow-sm">
-                <div className="bg-[#E89A00] w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                <div className="bg-accent w-12 h-12 rounded-lg flex items-center justify-center mb-4">
                   <Eye className="h-6 w-6 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-[#1a1a2e] mb-4" style={{ fontFamily: "var(--font-fredoka)" }}>
+                <h3 className="font-heading text-2xl font-bold text-foreground mb-4">
                   Visión
                 </h3>
                 <p className="text-gray-600">
@@ -109,17 +109,17 @@ export default function NosotrosPage() {
         <section className="py-16 bg-white">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e]" style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h2 className="font-heading text-3xl md:text-4xl font-bold text-foreground">
                 Nuestros Valores
               </h2>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {values.map((value, index) => (
                 <div key={index} className="text-center p-6 rounded-xl border hover:shadow-lg transition-shadow">
-                  <div className="bg-[#0D4DAA]/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <value.icon className="h-8 w-8 text-[#0D4DAA]" />
+                  <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <value.icon className="h-8 w-8 text-primary" />
                   </div>
-                  <h3 className="text-lg font-bold text-[#1a1a2e] mb-2">{value.title}</h3>
+                  <h3 className="text-lg font-bold text-foreground mb-2">{value.title}</h3>
                   <p className="text-gray-500 text-sm">{value.description}</p>
                 </div>
               ))}
@@ -128,37 +128,37 @@ export default function NosotrosPage() {
         </section>
 
         {/* Location */}
-        <section className="py-16 bg-[#F7EFEF]">
+        <section className="py-16 bg-secondary">
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div>
-                <h2 className="text-3xl font-bold text-[#1a1a2e] mb-6" style={{ fontFamily: "var(--font-fredoka)" }}>
+                <h2 className="font-heading text-3xl font-bold text-foreground mb-6">
                   Visítanos
                 </h2>
                 <div className="space-y-4">
                   <div className="flex items-start gap-4">
-                    <MapPin className="h-6 w-6 text-[#0D4DAA] mt-1" />
+                    <MapPin className="h-6 w-6 text-primary mt-1" />
                     <div>
                       <p className="font-medium">Dirección</p>
                       <p className="text-gray-500">Carrera 6 #24-14, Pereira, Risaralda, Colombia</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-4">
-                    <Phone className="h-6 w-6 text-[#0D4DAA] mt-1" />
+                    <Phone className="h-6 w-6 text-primary mt-1" />
                     <div>
                       <p className="font-medium">Teléfono</p>
-                      <a href="tel:6063335206" className="text-gray-500 hover:text-[#0D4DAA]">606 333-5206</a>
+                      <a href="tel:6063335206" className="text-gray-500 hover:text-primary">606 333-5206</a>
                     </div>
                   </div>
                   <div className="flex items-start gap-4">
-                    <Mail className="h-6 w-6 text-[#0D4DAA] mt-1" />
+                    <Mail className="h-6 w-6 text-primary mt-1" />
                     <div>
                       <p className="font-medium">Email</p>
-                      <a href="mailto:info@compusum.co" className="text-gray-500 hover:text-[#0D4DAA]">info@compusum.co</a>
+                      <a href="mailto:info@compusum.co" className="text-gray-500 hover:text-primary">info@compusum.co</a>
                     </div>
                   </div>
                   <div className="flex items-start gap-4">
-                    <Clock className="h-6 w-6 text-[#0D4DAA] mt-1" />
+                    <Clock className="h-6 w-6 text-primary mt-1" />
                     <div>
                       <p className="font-medium">Horario</p>
                       <p className="text-gray-500">Lunes a Viernes: 8:00 AM - 6:00 PM</p>

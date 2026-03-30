@@ -164,9 +164,7 @@ export default async function HomePage() {
         {/* Hero Section - B2B Focus */}
         <section className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
           {/* Subtle pattern overlay */}
-          <div className="absolute inset-0 opacity-5" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-          }} />
+          <div className="hero-pattern absolute inset-0 opacity-5" />
           
           <div className="container mx-auto px-4 py-10 sm:py-16 md:py-24 lg:py-32 relative">
             <div className="max-w-4xl mx-auto text-center">
@@ -176,7 +174,7 @@ export default async function HomePage() {
               </Badge>
               
               {/* Main Headline */}
-              <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-6" style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h1 className="font-heading text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-6">
                 Tu aliado estratégico en<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
                   suministros de papelería
@@ -230,7 +228,7 @@ export default async function HomePage() {
               <div className="grid grid-cols-4 gap-2 sm:gap-6 pt-6 sm:pt-8 border-t border-slate-700/50">
                 {trustIndicators.map((item, index) => (
                   <div key={index} className="text-center">
-                    <div className="text-lg sm:text-2xl md:text-3xl font-bold text-white mb-0.5 sm:mb-1" style={{ fontFamily: "var(--font-fredoka)" }}>
+                    <div className="font-heading text-lg sm:text-2xl md:text-3xl font-bold text-white mb-0.5 sm:mb-1">
                       {item.value}
                     </div>
                     <div className="text-[10px] sm:text-sm text-slate-400 leading-tight">{item.label}</div>
@@ -268,7 +266,7 @@ export default async function HomePage() {
               <Badge variant="outline" className="border-slate-300 text-slate-600 mb-3 sm:mb-4">
                 Líneas de producto
               </Badge>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-3 sm:mb-4" style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-3 sm:mb-4">
                 Soluciones para cada tipo de negocio
               </h2>
               <p className="text-slate-500 text-sm sm:text-lg">
@@ -295,7 +293,7 @@ export default async function HomePage() {
                         </div>
                         
                         {/* Content */}
-                        <h3 className="text-sm sm:text-xl font-semibold text-slate-900 mb-1 sm:mb-2" style={{ fontFamily: "var(--font-fredoka)" }}>
+                        <h3 className="font-heading text-sm sm:text-xl font-semibold text-slate-900 mb-1 sm:mb-2">
                           {line.title}
                         </h3>
                         <p className="text-slate-500 text-xs sm:text-sm mb-2 sm:mb-4 line-clamp-2 hidden sm:block">
@@ -341,7 +339,7 @@ export default async function HomePage() {
               <Badge variant="outline" className="border-slate-300 text-slate-600 mb-4">
                 ¿Cómo funciona?
               </Badge>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-3 sm:mb-4" style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-3 sm:mb-4">
                 Pedidos simples, sin complicaciones
               </h2>
               <p className="text-slate-500 text-sm sm:text-lg">
@@ -361,7 +359,7 @@ export default async function HomePage() {
                   <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 border border-slate-200 hover:shadow-lg transition-shadow h-full">
                     {/* Step Number */}
                     <div className="w-10 h-10 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-2xl flex items-center justify-center mb-2 sm:mb-4 shadow-lg shadow-blue-500/20">
-                      <span className="text-lg sm:text-2xl font-bold text-white" style={{ fontFamily: "var(--font-fredoka)" }}>
+                      <span className="font-heading text-lg sm:text-2xl font-bold text-white">
                         {step.step}
                       </span>
                     </div>
@@ -398,7 +396,7 @@ export default async function HomePage() {
                 <Badge variant="outline" className="border-slate-300 text-slate-600 mb-3 sm:mb-4">
                   Cobertura y logística
                 </Badge>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4 sm:mb-6" style={{ fontFamily: "var(--font-fredoka)" }}>
+                <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4 sm:mb-6">
                   Rutas semanales a tu ciudad
                 </h2>
                 <p className="text-slate-500 text-sm sm:text-lg mb-6 sm:mb-8">
@@ -477,15 +475,15 @@ export default async function HomePage() {
                   {/* Quick Stats */}
                   <div className="grid grid-cols-3 gap-2 sm:gap-4">
                     <div className="text-center">
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900" style={{ fontFamily: "var(--font-fredoka)" }}>2-5</div>
+                      <div className="font-heading text-xl sm:text-2xl font-bold text-slate-900">2-5</div>
                       <div className="text-[10px] sm:text-xs text-slate-500">Días hábiles</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900" style={{ fontFamily: "var(--font-fredoka)" }}>15+</div>
+                      <div className="font-heading text-xl sm:text-2xl font-bold text-slate-900">15+</div>
                       <div className="text-[10px] sm:text-xs text-slate-500">Ciudades</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900" style={{ fontFamily: "var(--font-fredoka)" }}>100%</div>
+                      <div className="font-heading text-xl sm:text-2xl font-bold text-slate-900">100%</div>
                       <div className="text-[10px] sm:text-xs text-slate-500">Rastreable</div>
                     </div>
                   </div>
@@ -502,7 +500,7 @@ export default async function HomePage() {
               <Badge className="bg-white/10 text-white border border-white/20 mb-3 sm:mb-4">
                 ¿Para quién es?
               </Badge>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4" style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">
                 Diseñado para negocios como el tuyo
               </h2>
               <p className="text-slate-400 text-sm sm:text-lg">
@@ -535,26 +533,25 @@ export default async function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-b from-white via-gray-50/50 to-white" />
           
           {/* Decorative elements */}
-          <div className="absolute top-20 left-10 w-64 h-64 bg-[#0D4DAA]/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-[#E89A00]/5 rounded-full blur-3xl" />
+          <div className="absolute top-20 left-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
           
           <div className="container mx-auto px-4 relative z-10">
             {/* Section Header */}
             <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
               {/* Animated Badge */}
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#0D4DAA]/10 to-[#E89A00]/10 
-                              backdrop-blur-sm border border-[#0D4DAA]/20 rounded-full px-5 py-2 mb-6">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-primary/10 to-accent/10 
+                              backdrop-blur-sm border border-primary/20 rounded-full px-5 py-2 mb-6">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E89A00] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#E89A00]"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
                 </span>
-                <span className="text-sm font-medium text-[#0D4DAA]">Distribuidores autorizados</span>
+                <span className="text-sm font-medium text-primary">Distribuidores autorizados</span>
               </div>
               
-              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4" 
-                  style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
                 Trabajamos con las{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0D4DAA] to-[#E89A00]">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
                   mejores marcas
                 </span>
               </h2>
@@ -575,12 +572,12 @@ export default async function HomePage() {
                 >
                   <div className="relative bg-white rounded-2xl overflow-hidden border border-gray-100 
                                   transition-all duration-500 ease-out
-                                  hover:border-[#0D4DAA]/30 hover:shadow-xl hover:shadow-[#0D4DAA]/10
+                                  hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10
                                   hover:-translate-y-1">
                     
                     {/* Gradient Overlay on Hover */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#0D4DAA]/0 to-[#E89A00]/0 
-                                    group-hover:from-[#0D4DAA]/5 group-hover:to-[#E89A00]/5 
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-accent/0 
+                                    group-hover:from-primary/5 group-hover:to-accent/5 
                                     transition-all duration-500 rounded-2xl" />
 
                     {/* Logo Container */}
@@ -588,7 +585,7 @@ export default async function HomePage() {
                                     flex items-center justify-center p-3 sm:p-4 overflow-hidden">
                       {/* Background Pattern */}
                       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(13,77,170,0.05),transparent_70%)]" />
+                        <div className="radial-primary-soft absolute inset-0" />
                       </div>
 
                       {/* Logo Image */}
@@ -612,7 +609,7 @@ export default async function HomePage() {
 
                     {/* Brand Name */}
                     <div className="px-2 py-2 sm:px-3 sm:py-3 bg-white border-t border-gray-50">
-                      <p className="text-[10px] sm:text-xs font-medium text-gray-700 group-hover:text-[#0D4DAA] 
+                      <p className="text-[10px] sm:text-xs font-medium text-gray-700 group-hover:text-primary 
                                     transition-colors duration-300 text-center truncate">
                         {brand.name}
                       </p>
@@ -626,9 +623,9 @@ export default async function HomePage() {
             <div className="text-center mt-10 sm:mt-12">
               <Button 
                 asChild 
-                className="bg-white border-2 border-[#0D4DAA] text-[#0D4DAA] hover:bg-[#0D4DAA] hover:text-white
+                  className="bg-white border-2 border-primary text-primary hover:bg-primary hover:text-white
                            px-8 py-6 text-base sm:text-lg font-medium
-                           shadow-lg shadow-[#0D4DAA]/10 hover:shadow-xl hover:shadow-[#0D4DAA]/20
+                           shadow-lg shadow-primary/10 hover:shadow-xl hover:shadow-primary/20
                            transition-all duration-300 hover:-translate-y-0.5"
               >
                 <Link href="/marcas" className="flex items-center gap-2">
@@ -668,7 +665,7 @@ export default async function HomePage() {
         <section className="py-10 sm:py-16 md:py-24 bg-gradient-to-br from-blue-600 to-blue-700 text-white">
           <div className="container mx-auto px-4">
             <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4" style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">
                 ¿Listo para optimizar tus suministros?
               </h2>
               <p className="text-blue-100 text-sm sm:text-lg mb-6 sm:mb-8">

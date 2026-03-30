@@ -95,7 +95,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const stockStatusColors = {
     disponible: "bg-green-500",
     agotado: "bg-gray-500",
-    por_pedido: "bg-[#E89A00]"
+    por_pedido: "bg-accent"
   };
 
   const stockStatusLabels = {
@@ -111,24 +111,24 @@ export default async function ProductDetailPage({ params }: PageProps) {
       
       <main className="flex-1">
         {/* Breadcrumb */}
-        <div className="bg-[#F7EFEF] py-3">
+        <div className="bg-secondary py-3">
           <div className="container mx-auto px-4">
             <nav className="flex items-center gap-2 text-sm">
-              <Link href="/" className="text-gray-500 hover:text-[#0D4DAA]">Inicio</Link>
+              <Link href="/" className="text-gray-500 hover:text-primary">Inicio</Link>
               <ChevronRight className="h-4 w-4 text-gray-400" />
               {product.category?.parent && (
                 <>
-                  <Link href={`/catalogo?categoria=${product.category.parent.slug}`} className="text-gray-500 hover:text-[#0D4DAA]">
+                  <Link href={`/catalogo?categoria=${product.category.parent.slug}`} className="text-gray-500 hover:text-primary">
                     {product.category.parent.name}
                   </Link>
                   <ChevronRight className="h-4 w-4 text-gray-400" />
                 </>
               )}
-              <Link href={`/catalogo?categoria=${product.category?.slug}`} className="text-gray-500 hover:text-[#0D4DAA]">
+              <Link href={`/catalogo?categoria=${product.category?.slug}`} className="text-gray-500 hover:text-primary">
                 {product.category?.name}
               </Link>
               <ChevronRight className="h-4 w-4 text-gray-400" />
-              <span className="text-[#1a1a2e] font-medium truncate">{product.name}</span>
+              <span className="text-foreground font-medium truncate">{product.name}</span>
             </nav>
           </div>
         </div>
@@ -157,7 +157,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       </Badge>
                     )}
                     {product.isFeatured && (
-                      <Badge className="bg-[#E89A00] text-white gap-1">
+                      <Badge className="bg-accent text-white gap-1">
                         <Star className="h-3 w-3" />
                         Destacado
                       </Badge>
@@ -169,7 +169,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   {[1, 2, 3, 4].map((i) => (
                     <div 
                       key={i}
-                      className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-[#0D4DAA] transition-all"
+                      className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                     >
                       <Image
                         src={`https://picsum.photos/seed/${product.slug}-${i}/200/200`}
@@ -189,7 +189,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 {product.brand && (
                   <Link 
                     href={`/marcas/${product.brand.slug}`}
-                    className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-[#0D4DAA]"
+                    className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-primary"
                   >
                     <div className="w-8 h-8 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
                       <img
@@ -203,7 +203,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 )}
 
                 {/* Name */}
-                <h1 className="text-3xl md:text-4xl font-bold text-[#1a1a2e]" style={{ fontFamily: "var(--font-fredoka)" }}>
+                <h1 className="font-heading text-3xl md:text-4xl font-bold text-foreground">
                   {product.name}
                 </h1>
 
@@ -220,10 +220,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 </div>
 
                 {/* Prices */}
-                <div className="bg-[#F7EFEF] rounded-xl p-6">
+                <div className="bg-secondary rounded-xl p-6">
                   {productCatalogMode ? (
                     <div>
-                      <p className="text-lg font-semibold text-[#0D4DAA]">
+                      <p className="text-lg font-semibold text-primary">
                         Precio a consultar
                       </p>
                       <p className="text-sm text-gray-500 mt-1">
@@ -239,10 +239,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       )}
                       {product.wholesalePrice && (
                         <div className="flex items-baseline gap-3">
-                          <p className="text-3xl font-bold text-[#0D4DAA]">
+                          <p className="text-3xl font-bold text-primary">
                             {formatPrice(product.wholesalePrice)}
                           </p>
-                          <Badge className="bg-[#E89A00] text-white">
+                          <Badge className="bg-accent text-white">
                             Precio mayorista
                           </Badge>
                         </div>
@@ -283,8 +283,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 {/* Benefits */}
                 <div className="grid grid-cols-2 gap-4 pt-4">
                   <div className="flex items-center gap-3">
-                    <div className="bg-[#0D4DAA]/10 p-2 rounded-lg">
-                      <Truck className="h-5 w-5 text-[#0D4DAA]" />
+                    <div className="bg-primary/10 p-2 rounded-lg">
+                      <Truck className="h-5 w-5 text-primary" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">Envíos a todo Colombia</p>
@@ -292,8 +292,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="bg-[#0D4DAA]/10 p-2 rounded-lg">
-                      <Shield className="h-5 w-5 text-[#0D4DAA]" />
+                    <div className="bg-primary/10 p-2 rounded-lg">
+                      <Shield className="h-5 w-5 text-primary" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">Garantía de calidad</p>
@@ -307,11 +307,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
             {/* Tabs */}
             <div className="mt-12">
               <Tabs defaultValue="descripcion" className="w-full">
-                <TabsList className="w-full justify-start bg-[#F7EFEF] p-1 rounded-lg">
-                  <TabsTrigger value="descripcion" className="data-[state=active]:bg-white data-[state=active]:text-[#0D4DAA]">
+                <TabsList className="w-full justify-start bg-secondary p-1 rounded-lg">
+                  <TabsTrigger value="descripcion" className="data-[state=active]:bg-white data-[state=active]:text-primary">
                     Descripción
                   </TabsTrigger>
-                  <TabsTrigger value="envio" className="data-[state=active]:bg-white data-[state=active]:text-[#0D4DAA]">
+                  <TabsTrigger value="envio" className="data-[state=active]:bg-white data-[state=active]:text-primary">
                     Envío y entregas
                   </TabsTrigger>
                 </TabsList>
@@ -330,7 +330,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 <TabsContent value="envio" className="mt-6 p-6 bg-white rounded-xl border">
                   <div className="space-y-4">
                     <div className="flex items-start gap-3">
-                      <Truck className="h-5 w-5 text-[#0D4DAA] mt-0.5" />
+                      <Truck className="h-5 w-5 text-primary mt-0.5" />
                       <div>
                         <p className="font-medium">Envíos a todo Colombia</p>
                         <p className="text-sm text-gray-500">
@@ -340,7 +340,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <MessageCircle className="h-5 w-5 text-[#25D366] mt-0.5" />
+                      <MessageCircle className="h-5 w-5 text-green-500 mt-0.5" />
                       <div>
                         <p className="font-medium">Cotización personalizada</p>
                         <p className="text-sm text-gray-500">
@@ -358,9 +358,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
         {/* Related Products */}
         {relatedProducts.length > 0 && (
-          <section className="py-12 bg-[#F7EFEF]">
+          <section className="py-12 bg-secondary">
             <div className="container mx-auto px-4">
-              <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e] mb-8" style={{ fontFamily: "var(--font-fredoka)" }}>
+              <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-8">
                 También te puede interesar
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">

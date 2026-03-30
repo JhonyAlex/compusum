@@ -111,11 +111,11 @@ export function Sidebar({ user }: SidebarProps) {
       >
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-5 border-b border-slate-200">
-          <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+          <div className="w-9 h-9 bg-gradient-to-br from-primary to-blue-700 rounded-lg flex items-center justify-center">
             <Store className="h-5 w-5 text-white" />
           </div>
           <div>
-            <span className="text-lg font-bold text-slate-900" style={{ fontFamily: "var(--font-fredoka)" }}>
+            <span className="font-heading text-lg font-bold text-slate-900">
               Compusum
             </span>
             <span className="block text-[10px] text-slate-400 -mt-0.5">Panel Admin</span>

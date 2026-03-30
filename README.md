@@ -82,6 +82,24 @@ bunx prisma db seed
 - Registros de trabajo: `worklog.md`
 - Logs de servidor: `logsservidor.md`
 
+## Sistema de estilos y tema
+
+Los tokens visuales globales (colores, radios, sombras, transiciones, tipografias) viven en `src/app/globals.css`.
+
+Regla de consistencia:
+
+- No agregar colores hardcodeados (`#hex`, `rgb`, `rgba`) en codigo nuevo.
+- Usar clases semanticas globales (`font-heading`, `font-body`) para tipografia.
+- Para nuevos estilos reutilizables, primero crear/actualizar tokens en `:root` y luego consumirlos en componentes.
+
+Validacion automatica para cambios nuevos de UI:
+
+```bash
+bun run styles:guard
+```
+
+Este comando revisa solo lineas nuevas/modificadas y evita que entren estilos hardcodeados fuera del sistema de tokens.
+
 ## Soporte y Contacto
 
 Para evolucion del proyecto, nuevas funcionalidades o automatizaciones a medida:

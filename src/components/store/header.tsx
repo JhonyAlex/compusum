@@ -82,11 +82,11 @@ export function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg" style={{ fontFamily: "var(--font-fredoka)" }}>C</span>
+              <div className="w-10 h-10 bg-gradient-to-br from-primary to-blue-700 rounded-lg flex items-center justify-center">
+                <span className="font-heading text-white font-bold text-lg">C</span>
               </div>
               <div className="hidden sm:block">
-                <span className="text-xl font-bold text-slate-900" style={{ fontFamily: "var(--font-fredoka)" }}>
+                <span className="font-heading text-xl font-bold text-slate-900">
                   Compusum
                 </span>
                 <span className="block text-[10px] text-slate-400 -mt-1">Papelería Mayorista</span>
@@ -118,7 +118,7 @@ export function Header() {
                       </DropdownMenuItem>
                     ))}
                     <DropdownMenuItem asChild className="border-t border-slate-100 mt-1 pt-1">
-                      <Link href="/catalogo" className="text-blue-600 font-medium">
+                      <Link href="/catalogo" className="text-primary font-medium">
                         Ver catálogo completo
                       </Link>
                     </DropdownMenuItem>
@@ -147,7 +147,7 @@ export function Header() {
             {/* CTA Button */}
             <Button
               asChild
-              className="hidden sm:flex bg-blue-600 hover:bg-blue-700 text-white"
+              className="hidden sm:flex bg-primary hover:bg-primary/90 text-white"
             >
               <Link href="/contacto">
                 Registrarme
@@ -167,11 +167,11 @@ export function Header() {
                 <div className="flex flex-col h-full px-4 pt-6 pb-4">
                   {/* Logo */}
                   <div className="flex items-center gap-2 mb-8 px-2">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-lg" style={{ fontFamily: "var(--font-fredoka)" }}>C</span>
+                    <div className="w-10 h-10 bg-gradient-to-br from-primary to-blue-700 rounded-lg flex items-center justify-center">
+                      <span className="font-heading text-white font-bold text-lg">C</span>
                     </div>
                     <div>
-                      <span className="text-lg font-bold text-slate-900" style={{ fontFamily: "var(--font-fredoka)" }}>
+                      <span className="font-heading text-lg font-bold text-slate-900">
                         Compusum
                       </span>
                       <span className="block text-[10px] text-slate-400">Papelería Mayorista</span>
@@ -206,7 +206,7 @@ export function Header() {
                     <Link
                       href="/catalogo"
                       onClick={() => setIsOpen(false)}
-                      className="px-4 py-3 text-blue-600 hover:text-blue-700 font-medium hover:bg-slate-50 rounded-lg transition-colors"
+                      className="px-4 py-3 text-primary hover:text-primary/80 font-medium hover:bg-slate-50 rounded-lg transition-colors"
                     >
                       Ver catálogo completo
                     </Link>
@@ -240,7 +240,7 @@ export function Header() {
                   <div className="mt-auto pt-6 border-t border-slate-100">
                     <Button
                       asChild
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                      className="w-full bg-primary hover:bg-primary/90 text-white"
                     >
                       <Link href="/contacto" onClick={() => setIsOpen(false)}>
                         Registrarme como mayorista

@@ -167,7 +167,17 @@ export default async function AdminCartDetailPage({ params }: Props) {
           </Card>
 
           {/* Admin Actions */}
-          <CartAdminActions cartId={cart.id} isActive={cart.isActive} status={cart.status} />
+          <CartAdminActions
+            cartId={cart.id}
+            isActive={cart.isActive}
+            status={cart.status}
+            customerName={cart.customerName}
+            customerEmail={cart.customerEmail}
+            customerPhone={cart.customerPhone}
+            customerCompany={cart.customerCompany}
+            notes={cart.notes}
+            hasOrders={cart.orders.length > 0}
+          />
         </div>
 
         {/* Products */}

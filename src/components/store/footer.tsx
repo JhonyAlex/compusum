@@ -43,11 +43,11 @@ export function Footer() {
           <div className="lg:col-span-2">
             {/* Logo */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-xl" style={{ fontFamily: "var(--font-fredoka)" }}>C</span>
+              <div className="w-12 h-12 bg-gradient-to-br from-primary to-blue-600 rounded-xl flex items-center justify-center">
+                <span className="font-heading text-white font-bold text-xl">C</span>
               </div>
               <div>
-                <span className="text-xl font-bold text-white" style={{ fontFamily: "var(--font-fredoka)" }}>
+                <span className="font-heading text-xl font-bold text-white">
                   Compusum
                 </span>
                 <span className="block text-xs text-slate-400">Papelería Mayorista</span>

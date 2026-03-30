@@ -203,7 +203,7 @@ export default async function AdminConfigPage({
                     />
                   </div>
 
-                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                  <Button type="submit" className="bg-primary hover:bg-primary/90">
                     <Save className="h-4 w-4 mr-2" />
                     Guardar configuración
                   </Button>

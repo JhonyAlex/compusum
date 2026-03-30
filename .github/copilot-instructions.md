@@ -57,3 +57,15 @@ La migracion `20260312090000_add_session_based_upsert` fallo en la base de produ
 - Todo SQL en migraciones nuevas debe usar `IF NOT EXISTS` en `ADD COLUMN`, `CREATE INDEX` y `CREATE UNIQUE INDEX`.
 - `bootstrap.ts` debe manejar `P3009`: detectar el nombre de la migracion fallida desde el stderr (patron: `The \`<nombre>\` migration started at .* failed`), ejecutar `migrate resolve --rolled-back <nombre>`, y reintentar `migrate deploy`. Ver implementacion en `prisma/bootstrap.ts`.
 - Antes de hacer push de una migracion nueva, verificar que el SQL sea idempotente o que no existan estados parciales en la base de destino.
+
+## Sistema de estilos global (obligatorio para cambios UI)
+
+Cuando un cambio toque componentes, paginas, layouts o cualquier elemento visual, seguir estas reglas:
+
+1. No agregar colores hardcodeados (`#hex`, `rgb`, `rgba`) en `tsx/css` nuevos. Usar tokens globales definidos en `src/app/globals.css`.
+2. No usar `style={{ fontFamily: "var(--font-fredoka)" }}` en elementos nuevos. Usar clases semanticas globales (`font-heading`, `font-body`).
+3. Si se necesita un color, sombra, radio, animacion o transicion nueva, agregar primero el token en `:root` dentro de `src/app/globals.css` y luego consumirlo desde componentes.
+4. Si un componente requiere variantes visuales reutilizables, resolverlo con componentes base (`src/components/ui/**`) y `cva` antes de repetir clases por pagina.
+5. Validar consistencia con `bun run styles:guard` antes de cerrar cambios UI.
+
+Objetivo: que un cambio de tema o look & feel se pueda ejecutar desde un punto central sin tener que buscar estilos hardcodeados por todo el proyecto.

@@ -14,7 +14,7 @@ export function Header({ title, subtitle }: HeaderProps) {
     <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="lg:ml-0 ml-12">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900" style={{ fontFamily: "var(--font-fredoka)" }}>
+          <h1 className="font-heading text-xl sm:text-2xl font-bold text-slate-900">
             {title}
           </h1>
           {subtitle && (

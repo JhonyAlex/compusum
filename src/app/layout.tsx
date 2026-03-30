@@ -44,7 +44,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body
-        className={`${fredoka.variable} ${poppins.variable} antialiased bg-background text-foreground`}
+        className={`${fredoka.variable} ${poppins.variable} font-body antialiased bg-background text-foreground`}
       >
         {children}
         <CartProvider />
