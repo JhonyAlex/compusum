@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
@@ -82,9 +83,14 @@ export function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-blue-700 rounded-lg flex items-center justify-center">
-                <span className="font-heading text-white font-bold text-lg">C</span>
-              </div>
+              <Image
+                src="/logo-icon.png"
+                alt="Compusum Logo"
+                width={40}
+                height={40}
+                priority
+                className="w-10 h-10"
+              />
               <div className="hidden sm:block">
                 <span className="font-heading text-xl font-bold text-slate-900">
                   Compusum
