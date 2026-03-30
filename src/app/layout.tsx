@@ -22,8 +22,8 @@ export const metadata: Metadata = {
   keywords: ["papelería", "mayorista", "Pereira", "Colombia", "útiles escolares", "oficina", "Compusum"],
   authors: [{ name: "Compusum S.A.S." }],
   icons: {
-    icon: "/logo-icon.png",
-    apple: "/logo-icon.png",
+    icon: "/icono.svg",
+    apple: "/icono.svg",
   },
   openGraph: {
     title: "Compusum | Tu Papelería al por Mayor",

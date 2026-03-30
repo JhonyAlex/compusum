@@ -84,7 +84,7 @@ export function Header() {
           <Link href="/" className="flex items-center gap-2">
             <div className="flex items-center gap-2">
               <Image
-                src="/logo-icon.png"
+                src="/icono.svg"
                 alt="Compusum Logo"
                 width={40}
                 height={40}

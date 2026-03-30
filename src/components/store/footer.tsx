@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { 
   Phone, 
   Mail, 
@@ -43,9 +44,13 @@ export function Footer() {
           <div className="lg:col-span-2">
             {/* Logo */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-primary to-blue-600 rounded-xl flex items-center justify-center">
-                <span className="font-heading text-white font-bold text-xl">C</span>
-              </div>
+              <Image
+                src="/icono.svg"
+                alt="Compusum Logo"
+                width={48}
+                height={48}
+                className="w-12 h-12"
+              />
               <div>
                 <span className="font-heading text-xl font-bold text-white">
                   Compusum
