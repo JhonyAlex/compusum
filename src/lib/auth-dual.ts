@@ -1,5 +1,6 @@
 import { db } from './db';
 import { hashPassword, verifyPassword, createSession } from './auth';
+import { DEFAULT_MOCK_PHONE_OTP, PHONE_OTP_LENGTH } from './phone-otp';
 import { checkOtpWithTwilio, isTwilioVerifyConfigured, sendOtpWithTwilio } from './twilio-verify';
 
 function generateTemporaryPassword(): string {
@@ -41,7 +42,7 @@ export async function sendPhoneOtp(phone: string): Promise<{ provider: 'twilio' 
   if (isMockOtpEnabled()) {
     return {
       provider: 'mock',
-      debugCode: process.env.MOCK_PHONE_OTP || '123456',
+      debugCode: process.env.MOCK_PHONE_OTP || DEFAULT_MOCK_PHONE_OTP,
     };
   }
 
@@ -60,17 +61,22 @@ export async function loginWithPhone(
 ): Promise<{ token: string; user: any }> {
   const e164Phone = toE164Phone(phone);
   const normalizedPhone = normalizePhoneInput(e164Phone);
+  const normalizedOtpCode = otpCode.replace(/\D/g, '');
+
+  if (normalizedOtpCode.length !== PHONE_OTP_LENGTH) {
+    throw new Error(`El código OTP debe tener ${PHONE_OTP_LENGTH} dígitos`);
+  }
 
   if (isMockOtpEnabled()) {
-    const expectedOtp = process.env.MOCK_PHONE_OTP || '123456';
-    const isValidMockOtp = otpCode === expectedOtp;
+    const expectedOtp = process.env.MOCK_PHONE_OTP || DEFAULT_MOCK_PHONE_OTP;
+    const isValidMockOtp = normalizedOtpCode === expectedOtp;
     if (!isValidMockOtp) throw new Error('Código inválido');
   } else {
     if (!isTwilioVerifyConfigured()) {
       throw new Error('OTP no configurado. Define credenciales de Twilio Verify.');
     }
 
-    const isValidTwilioOtp = await checkOtpWithTwilio(e164Phone, otpCode);
+    const isValidTwilioOtp = await checkOtpWithTwilio(e164Phone, normalizedOtpCode);
     if (!isValidTwilioOtp) throw new Error('Código inválido o expirado');
   }
 

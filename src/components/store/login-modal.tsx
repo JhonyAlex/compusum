@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PHONE_OTP_LENGTH } from "@/lib/phone-otp";
 
 const OTP_PROGRESS_STORAGE_KEY = "compusum-login-otp-progress";
 const OTP_PROGRESS_TTL_MS = 15 * 60 * 1000;
@@ -227,10 +228,10 @@ export function LoginModal({ open, onOpenChange, onLoginSuccess }: LoginModalPro
               </p>
               <Input
                 type="text"
-                placeholder="123456"
+                placeholder="1234"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                maxLength={6}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, PHONE_OTP_LENGTH))}
+                maxLength={PHONE_OTP_LENGTH}
                 className="text-center text-2xl tracking-widest"
               />
             </div>
@@ -259,7 +260,7 @@ export function LoginModal({ open, onOpenChange, onLoginSuccess }: LoginModalPro
               >
                 Volver
               </Button>
-              <Button type="submit" className="flex-1" disabled={otp.length !== 6 || loading}>
+              <Button type="submit" className="flex-1" disabled={otp.length !== PHONE_OTP_LENGTH || loading}>
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
