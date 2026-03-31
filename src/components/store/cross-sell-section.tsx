@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -42,38 +42,40 @@ export function CrossSellSection() {
       .catch(() => {});
   }, []);
 
+  const categorySlug = items[0]?.product.category?.slug;
+  const cartProductIds = useMemo(
+    () => new Set(items.map((i) => i.product.id)),
+    [items],
+  );
+
   useEffect(() => {
-    if (!enabled || items.length === 0) {
+    if (!enabled || !categorySlug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSuggestions([]);
       return;
     }
-
-    const categorySlug = items[0]?.product.category?.slug;
-    if (!categorySlug) return;
-
-    const cartProductIds = new Set(items.map((i) => i.product.id));
 
     setLoading(true);
     fetch(`/api/products?categoria=${categorySlug}&limit=6`)
       .then((r) => r.json())
       .then((data) => {
         if (data.success && data.data) {
-          const filtered = data.data
-            .filter((p: CrossSellProduct) => !cartProductIds.has(p.id))
-            .slice(0, 3);
-          setSuggestions(filtered);
+          setSuggestions(data.data.slice(0, 6));
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [items, enabled]);
+  }, [categorySlug, enabled]);
 
-  if (suggestions.length === 0 || loading) return null;
+  const displaySuggestions = suggestions
+    .filter((p) => !cartProductIds.has(p.id))
+    .slice(0, 3);
+
+  if (displaySuggestions.length === 0 || loading) return null;
 
   const handleAdd = (product: CrossSellProduct) => {
     addItem(product as CartProduct, 1);
     toast.success("Producto agregado", { description: product.name });
-    setSuggestions((prev) => prev.filter((p) => p.id !== product.id));
   };
 
   return (
@@ -82,8 +84,11 @@ export function CrossSellSection() {
         Te podría interesar
       </p>
       <div className="space-y-2">
-        {suggestions.map((product) => (
-          <div key={product.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+        {displaySuggestions.map((product) => (
+          <div
+            key={product.id}
+            className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 transition-colors"
+          >
             <div className="relative w-10 h-10 flex-shrink-0 bg-slate-50 rounded overflow-hidden">
               <Image
                 src={`https://picsum.photos/seed/${product.slug}/60/60`}
@@ -101,7 +106,9 @@ export function CrossSellSection() {
                 {product.name}
               </Link>
               {catalogMode ? (
-                <p className="text-xs font-medium text-slate-500 italic">Consultar precio</p>
+                <p className="text-xs font-medium text-slate-500 italic">
+                  Consultar precio
+                </p>
               ) : (
                 <p className="text-xs font-medium text-blue-600">
                   {formatPrice(product.wholesalePrice || product.price)}
