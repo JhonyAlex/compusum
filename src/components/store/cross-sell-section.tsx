@@ -42,33 +42,52 @@ export function CrossSellSection() {
       .catch(() => {});
   }, []);
 
+  // ⚡ Bolt Optimization: Extract primitive values for dependency array
+  // This prevents redundant API requests when unrelated item properties (like quantity) change.
+  const hasItems = items.length > 0;
+  const categorySlug = items[0]?.product.category?.slug;
+  const itemIdsString = JSON.stringify(items.map((i) => i.product.id));
+
   useEffect(() => {
-    if (!enabled || items.length === 0) {
+    let isMounted = true;
+    if (!enabled || !hasItems) {
       setSuggestions([]);
       return;
     }
 
-    const categorySlug = items[0]?.product.category?.slug;
     if (!categorySlug) return;
 
-    const cartProductIds = new Set(items.map((i) => i.product.id));
+    const cartProductIds = new Set(JSON.parse(itemIdsString));
 
-    setLoading(true);
-    fetch(`/api/products?categoria=${categorySlug}&limit=6`)
-      .then((r) => r.json())
-      .then((data) => {
+    const fetchSuggestions = async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/products?categoria=${categorySlug}&limit=6`);
+        const data = await r.json();
+
+        if (!isMounted) return;
+
         if (data.success && data.data) {
           const filtered = data.data
             .filter((p: CrossSellProduct) => !cartProductIds.has(p.id))
             .slice(0, 3);
           setSuggestions(filtered);
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [items, enabled]);
+      } catch (error) {
+        // Ignorar error silenciado previamente
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
 
-  if (suggestions.length === 0 || loading) return null;
+    fetchSuggestions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [hasItems, categorySlug, itemIdsString, enabled]);
+
+  if (!enabled || !hasItems || suggestions.length === 0 || loading) return null;
 
   const handleAdd = (product: CrossSellProduct) => {
     addItem(product as CartProduct, 1);

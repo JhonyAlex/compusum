@@ -1,0 +1,3 @@
+## 2024-05-24 - Redundant Cross-Sell Fetching Avoidance
+**Learning:** Zustand's global state arrays (like `items` in the cart store) trigger full array reference changes on deep nested updates (e.g., when a cart item quantity changes). Directly passing this entire array into a `useEffect` dependency array meant that API requests like cross-sell recommendations fired on every quantity update, causing unnecessary network overhead.
+**Action:** Always extract the specific, primitive derived values needed (like a concatenated string of IDs or a category slug) during the render phase. Use these primitives in the dependency array to correctly trigger effects only when relevant properties actually change.
