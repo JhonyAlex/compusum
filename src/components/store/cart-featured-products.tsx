@@ -59,7 +59,7 @@ export function CartFeaturedProducts() {
         // Fallback: load featured products when settings fetch fails
         fetchFeaturedProducts();
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
   if (!enabled || loading || products.length === 0) return null;

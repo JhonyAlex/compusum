@@ -42,16 +42,18 @@ export function CrossSellSection() {
       .catch(() => {});
   }, []);
 
+  // Derive primitive values for useEffect dependencies to prevent re-fetches on quantity changes
+  const categorySlug = items[0]?.product.category?.slug;
+  const cartProductIdsStr = items.map((i) => i.product.id).sort().join(',');
+
   useEffect(() => {
-    if (!enabled || items.length === 0) {
+    if (!enabled || !categorySlug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSuggestions([]);
       return;
     }
 
-    const categorySlug = items[0]?.product.category?.slug;
-    if (!categorySlug) return;
-
-    const cartProductIds = new Set(items.map((i) => i.product.id));
+    const cartProductIds = new Set(cartProductIdsStr.split(',').filter(Boolean));
 
     setLoading(true);
     fetch(`/api/products?categoria=${categorySlug}&limit=6`)
@@ -66,9 +68,9 @@ export function CrossSellSection() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [items, enabled]);
+  }, [categorySlug, cartProductIdsStr, enabled]);
 
-  if (suggestions.length === 0 || loading) return null;
+  if (suggestions.length === 0 || loading || !enabled || !categorySlug) return null;
 
   const handleAdd = (product: CrossSellProduct) => {
     addItem(product as CartProduct, 1);
