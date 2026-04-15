@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import { useCatalogMode } from "@/hooks/use-catalog-mode";
 import { useCartStore, type CartProduct } from "@/stores/cart-store";
 import { formatPrice } from "@/lib/format";
@@ -87,7 +87,7 @@ export function CartFeaturedProducts() {
               className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-100 hover:border-blue-100 hover:bg-slate-50 transition-colors"
             >
               <div className="relative w-12 h-12 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden">
-                <Image
+                <SafeProductImage
                   src={resolveProductImageSrc(product.slug, "60/60")}
                   alt={productName}
                   fill

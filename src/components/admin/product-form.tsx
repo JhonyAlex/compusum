@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ImageUpload } from "@/components/admin/image-upload";
+import { normalizeProductImagePath } from "@/lib/product-fallbacks";
 
 interface Product {
   id: string;
@@ -98,7 +99,7 @@ export function ProductForm({ product, categories, brands }: ProductFormProps) {
     tags: product?.tags || "",
     sortOrder: product?.sortOrder || 0,
     images:
-      product?.images ||
+      product?.images.map((img) => ({ ...img, imagePath: normalizeProductImagePath(img.imagePath) })) ||
       ([] as { id?: string; imagePath: string; isPrimary: boolean }[]),
   });
 

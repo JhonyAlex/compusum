@@ -1,10 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -25,8 +34,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Trash2,
+  FolderSync,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useDebouncedSearch } from "@/hooks/use-debounced-search";
+import { normalizeProductImagePath } from "@/lib/product-fallbacks";
 
 interface Filters {
   search: string;
@@ -40,6 +53,8 @@ interface Filters {
   sortBy: string;
   sortOrder: string;
 }
+
+type BulkScope = "selected" | "page" | "list" | "all";
 
 async function fetchProducts(filters: Filters) {
   const params = new URLSearchParams();
@@ -63,6 +78,7 @@ async function fetchProducts(filters: Filters) {
 }
 
 export function AdminProductsTable() {
+  const queryClient = useQueryClient();
   const { query: searchInput, setQuery: setSearchInput, debouncedQuery } = useDebouncedSearch(300);
   const [filters, setFilters] = useState<Omit<Filters, "search">>({
     categoryId: "all",
@@ -75,6 +91,13 @@ export function AdminProductsTable() {
     sortBy: "createdAt",
     sortOrder: "desc",
   });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [rowSelectionArmed, setRowSelectionArmed] = useState(false);
+  const [bulkScope, setBulkScope] = useState<BulkScope>("selected");
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("none");
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   const fullFilters: Filters = { ...filters, search: debouncedQuery };
 
@@ -88,9 +111,13 @@ export function AdminProductsTable() {
   const pagination = data?.data?.pagination ?? { page: 1, limit: 25, total: 0, totalPages: 0 };
   const categories = data?.data?.categories ?? [];
   const brands = data?.data?.brands ?? [];
+  const productIds = useMemo(() => products.map((product: any) => product.id), [products]);
+  const selectedCount = selectedIds.size;
 
   const updateFilter = (updates: Partial<typeof filters>) => {
     setFilters((prev) => ({ ...prev, ...updates, page: 1 }));
+    setSelectedIds(new Set());
+    setLastSelectedIndex(null);
   };
 
   const hasActiveFilters =
@@ -100,6 +127,179 @@ export function AdminProductsTable() {
     filters.featured ||
     filters.isNew ||
     filters.status !== "all";
+
+  const getScopeIds = (scope: BulkScope) => {
+    if (scope === "selected") return Array.from(selectedIds);
+    if (scope === "page") return productIds;
+    return [];
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setLastSelectedIndex(null);
+  };
+
+  const selectFromRow = (index: number, event?: React.MouseEvent) => {
+    const id = productIds[index];
+    if (!id) return;
+
+    const useShift = !!event?.shiftKey;
+    const useMeta = !!event?.ctrlKey || !!event?.metaKey;
+
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+
+      if (useShift && lastSelectedIndex !== null) {
+        const start = Math.min(lastSelectedIndex, index);
+        const end = Math.max(lastSelectedIndex, index);
+        const rangeSelection = new Set<string>();
+        for (let i = start; i <= end; i += 1) {
+          const rangeId = productIds[i];
+          if (rangeId) rangeSelection.add(rangeId);
+        }
+        return useMeta ? new Set([...next, ...rangeSelection]) : rangeSelection;
+      } else if (useMeta) {
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+      } else {
+        return new Set([id]);
+      }
+
+      return next;
+    });
+
+    setLastSelectedIndex(index);
+  };
+
+  const toggleFromCheckbox = (index: number, event?: React.MouseEvent) => {
+    const id = productIds[index];
+    if (!id) return;
+
+    const useShift = !!event?.shiftKey;
+
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+
+      if (useShift && lastSelectedIndex !== null) {
+        const start = Math.min(lastSelectedIndex, index);
+        const end = Math.max(lastSelectedIndex, index);
+        for (let i = start; i <= end; i += 1) {
+          const rangeId = productIds[i];
+          if (rangeId) next.add(rangeId);
+        }
+      } else if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+
+    setLastSelectedIndex(index);
+  };
+
+  const isInteractiveTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    return !!target.closest("button, a, input, textarea, select, [data-slot='checkbox']");
+  };
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (scope: BulkScope) => {
+      const res = await fetch("/api/admin/products", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scope,
+          ids: getScopeIds(scope),
+          filters: {
+            search: debouncedQuery,
+            categoryId: filters.categoryId,
+            brandId: filters.brandId,
+            featured: filters.featured,
+            isNew: filters.isNew,
+            status: filters.status,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "No se pudo eliminar productos");
+      }
+      return json;
+    },
+    onSuccess: (result) => {
+      const deleted = result?.data?.deletedCount ?? 0;
+      const failed = result?.data?.failedCount ?? 0;
+      if (failed > 0) {
+        toast.warning(`Se eliminaron ${deleted} productos y ${failed} fallaron`);
+      } else {
+        toast.success(`Se eliminaron ${deleted} productos`);
+      }
+      clearSelection();
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "No se pudo eliminar productos");
+    },
+  });
+
+  const bulkCategoryMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        scope: bulkScope,
+        ids: getScopeIds(bulkScope),
+        filters: {
+          search: debouncedQuery,
+          categoryId: filters.categoryId,
+          brandId: filters.brandId,
+          featured: filters.featured,
+          isNew: filters.isNew,
+          status: filters.status,
+        },
+        categoryId: selectedCategoryId !== "none" ? selectedCategoryId : undefined,
+        createCategoryName: newCategoryName.trim() || undefined,
+      };
+
+      const res = await fetch("/api/admin/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "No se pudo cambiar categoría");
+      }
+      return json;
+    },
+    onSuccess: (result) => {
+      toast.success(`Se actualizaron ${result?.data?.updatedCount ?? 0} productos`);
+      setIsCategoryModalOpen(false);
+      setSelectedCategoryId("none");
+      setNewCategoryName("");
+      clearSelection();
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "No se pudo cambiar la categoría");
+    },
+  });
+
+  const togglePageSelection = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        productIds.forEach((id) => next.add(id));
+      } else {
+        productIds.forEach((id) => next.delete(id));
+      }
+      return next;
+    });
+    setRowSelectionArmed(true);
+  };
+
+  const selectedOnPage = productIds.filter((id) => selectedIds.has(id)).length;
+  const allOnPageSelected = productIds.length > 0 && selectedOnPage === productIds.length;
 
   return (
     <div className="p-4 sm:p-6">
@@ -196,6 +396,7 @@ export function AdminProductsTable() {
                 size="sm"
                 onClick={() => {
                   setSearchInput("");
+                  clearSelection();
                   setFilters({
                     categoryId: "all",
                     brandId: "all",
@@ -213,6 +414,57 @@ export function AdminProductsTable() {
               </Button>
             )}
           </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2">
+            <Select
+              value={bulkScope}
+              onValueChange={(value) => setBulkScope(value as BulkScope)}
+            >
+              <SelectTrigger className="w-[220px] bg-white">
+                <SelectValue placeholder="Alcance" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="selected">Seleccionados ({selectedCount})</SelectItem>
+                <SelectItem value="page">Página actual ({productIds.length})</SelectItem>
+                <SelectItem value="list">Lista actual (filtros)</SelectItem>
+                <SelectItem value="all">Todos los productos</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="outline"
+              onClick={() => setIsCategoryModalOpen(true)}
+              disabled={
+                bulkCategoryMutation.isPending ||
+                (bulkScope === "selected" && selectedCount === 0) ||
+                (bulkScope === "page" && productIds.length === 0)
+              }
+            >
+              <FolderSync className="h-4 w-4 mr-2" />
+              Cambiar categoría
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={() => bulkDeleteMutation.mutate(bulkScope)}
+              disabled={
+                bulkDeleteMutation.isPending ||
+                (bulkScope === "selected" && selectedCount === 0) ||
+                (bulkScope === "page" && productIds.length === 0)
+              }
+            >
+              {bulkDeleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Eliminar masivo
+            </Button>
+
+            <p className="text-xs text-slate-500 ml-auto">
+              Tip: marca un checkbox y luego usa clic en fila. Shift = rango, Ctrl/Cmd = alternar.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -229,6 +481,13 @@ export function AdminProductsTable() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="w-10 py-3 px-3">
+                        <Checkbox
+                          checked={allOnPageSelected}
+                          onCheckedChange={(checked) => togglePageSelection(!!checked)}
+                          aria-label="Seleccionar página"
+                        />
+                      </th>
                       <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">
                         Producto
                       </th>
@@ -250,14 +509,36 @@ export function AdminProductsTable() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {products.map((product: any) => (
-                      <tr key={product.id} className="hover:bg-slate-50">
+                    {products.map((product: any, index: number) => (
+                      <tr
+                        key={product.id}
+                        className={
+                          selectedIds.has(product.id)
+                            ? "bg-blue-50/60 hover:bg-blue-50"
+                            : "hover:bg-slate-50"
+                        }
+                        onClick={(event) => {
+                          if (!rowSelectionArmed || isInteractiveTarget(event.target)) return;
+                          selectFromRow(index, event);
+                        }}
+                      >
+                        <td className="py-3 px-3" onClick={(event) => event.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(product.id)}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setRowSelectionArmed(true);
+                              toggleFromCheckbox(index, event);
+                            }}
+                            aria-label={`Seleccionar ${product.name}`}
+                          />
+                        </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
                               {product.images?.[0]?.imagePath ? (
                                 <img
-                                  src={product.images[0].imagePath}
+                                  src={normalizeProductImagePath(product.images[0].imagePath)}
                                   alt={product.name}
                                   className="w-full h-full object-cover"
                                 />
@@ -375,7 +656,10 @@ export function AdminProductsTable() {
                       size="sm"
                       disabled={pagination.page === 1 || isFetching}
                       onClick={() =>
-                        setFilters((prev) => ({ ...prev, page: prev.page - 1 }))
+                        setFilters((prev) => {
+                          clearSelection();
+                          return { ...prev, page: prev.page - 1 };
+                        })
                       }
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -388,7 +672,10 @@ export function AdminProductsTable() {
                       size="sm"
                       disabled={pagination.page >= pagination.totalPages || isFetching}
                       onClick={() =>
-                        setFilters((prev) => ({ ...prev, page: prev.page + 1 }))
+                        setFilters((prev) => {
+                          clearSelection();
+                          return { ...prev, page: prev.page + 1 };
+                        })
                       }
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -416,6 +703,67 @@ export function AdminProductsTable() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar categoría de productos</DialogTitle>
+            <DialogDescription>
+              Puedes elegir una categoría existente o crear una nueva en este mismo modal.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium mb-1">Categoría existente</p>
+              <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin selección</SelectItem>
+                  {categories.map((category: any) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium mb-1">O crear nueva categoría</p>
+              <Input
+                placeholder="Nombre de nueva categoría"
+                value={newCategoryName}
+                onChange={(event) => setNewCategoryName(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCategoryModalOpen(false)}
+              disabled={bulkCategoryMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => bulkCategoryMutation.mutate()}
+              disabled={
+                bulkCategoryMutation.isPending ||
+                (!newCategoryName.trim() && selectedCategoryId === "none")
+              }
+            >
+              {bulkCategoryMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Aplicar cambio
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

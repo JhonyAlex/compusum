@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import Image from "next/image";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import {
   MessageCircle,
   Star,
@@ -193,7 +193,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
               {/* Image Gallery */}
               <div className="space-y-4">
                 <div className="relative aspect-square bg-gray-50 rounded-2xl overflow-hidden">
-                  <Image
+                  <SafeProductImage
                     src={resolveProductImageSrc(product.slug, "800/800")}
                     alt={productName}
                     fill
@@ -224,7 +224,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       key={i}
                       className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                     >
-                      <Image
+                      <SafeProductImage
                         src={resolveProductImageSrc(`${productSlug}-${i}`, "200/200")}
                         alt={`${productName} - Imagen ${i}`}
                         width={100}

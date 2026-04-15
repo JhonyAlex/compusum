@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { Header } from "@/components/admin/header";
 import { ImportadorCSV } from "@/components/admin/import-csv";
+import { BulkImageAssignment } from "@/components/admin/bulk-image-assignment";
 
 export default async function AdminImportPage() {
   const user = await getCurrentUser();
@@ -14,6 +15,7 @@ export default async function AdminImportPage() {
         subtitle="Carga productos desde un archivo CSV"
       />
       <ImportadorCSV />
+      <BulkImageAssignment />
     </>
   );
 }

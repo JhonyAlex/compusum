@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   ShoppingCart,
@@ -17,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import { useCartStore } from "@/stores/cart-store";
 import { formatPrice } from "@/lib/format";
 import { resolveProductImageSrc, resolveProductName, resolveProductSlug } from "@/lib/product-fallbacks";
@@ -192,7 +192,7 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
             return (
               <div key={item.id} className="flex gap-3 px-4 py-3 border-b border-slate-100 last:border-0">
                 <div className="relative w-14 h-14 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden">
-                  <Image
+                  <SafeProductImage
                     src={resolveProductImageSrc(item.product.slug, "100/100")}
                     alt={productName}
                     fill

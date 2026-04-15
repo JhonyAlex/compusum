@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import { useCartStore, type CartItem, getCartItemKey } from "@/stores/cart-store";
 import { formatPrice } from "@/lib/format";
 import { resolveProductImageSrc, resolveProductName, resolveProductSlug } from "@/lib/product-fallbacks";
@@ -27,7 +27,7 @@ export function CartItemRow({ item, hidePrices = false }: CartItemRowProps) {
     <div className="flex gap-3 py-3 border-b border-slate-100 last:border-0">
       {/* Image */}
       <div className="relative w-16 h-16 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden">
-        <Image
+        <SafeProductImage
           src={resolveProductImageSrc(item.product.slug, "100/100")}
           alt={productName}
           fill

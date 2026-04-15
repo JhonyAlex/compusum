@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import type { ProductGroup } from '@/lib/csv-import';
+import { normalizeProductImagePath } from '@/lib/product-fallbacks';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -15,8 +16,11 @@ function toSlug(text: string): string {
     .replace(/\s+/g, '-');
 }
 
-function parseCurrency(value?: string): number | null {
-  if (!value) return null;
+function parseCurrency(value?: string | number | null): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
   const normalized = value.trim().replace(/[^\d.,]/g, '').replace(',', '.');
   if (!normalized) return null;
   const parsed = parseFloat(normalized);
@@ -31,6 +35,21 @@ function normalizeVariantName(value?: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+}
+
+function normalizeLookup(value?: string): string {
+  if (!value) return '';
+  return value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function normalizeReferenceKey(value?: string): string {
+  if (!value) return '';
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 // ─── POST /api/admin/import ───────────────────────────────────────────────────
@@ -68,17 +87,61 @@ export async function POST(request: Request) {
   const result = { created: 0, updated: 0, skipped: 0, errors: [] as string[] };
   let processed = 0;
 
+  // Consolidate duplicate references in the same payload (case/space-insensitive).
+  const consolidatedByReference = new Map<string, ProductGroup>();
+  for (const raw of products) {
+    const ref = (raw.reference ?? '').trim();
+    const refKey = normalizeReferenceKey(ref);
+    if (!refKey) {
+      result.errors.push('Referencia vacía en payload, se omite');
+      continue;
+    }
+
+    const existing = consolidatedByReference.get(refKey);
+    if (!existing) {
+      consolidatedByReference.set(refKey, {
+        ...raw,
+        reference: ref,
+        variants: [...(raw.variants ?? [])],
+      });
+      continue;
+    }
+
+    // Merge keeping first non-empty value for product-level fields.
+    existing.reference = existing.reference || ref;
+    existing.name = existing.name || raw.name;
+    existing.category = existing.category || raw.category;
+    existing.description = existing.description || raw.description;
+    existing.shortDescription = existing.shortDescription || raw.shortDescription;
+    existing.brand = existing.brand || raw.brand;
+    existing.price = existing.price ?? raw.price;
+    existing.stock = existing.stock ?? raw.stock;
+    existing.image = existing.image || raw.image;
+
+    // Merge variants by normalized name to avoid duplicates within a single import.
+    const seenVariantNames = new Set(existing.variants.map((v) => normalizeVariantName(v.name)));
+    for (const variant of raw.variants ?? []) {
+      const normalized = normalizeVariantName(variant.name);
+      if (!normalized || seenVariantNames.has(normalized)) continue;
+      seenVariantNames.add(normalized);
+      existing.variants.push(variant);
+    }
+  }
+
+  products = Array.from(consolidatedByReference.values());
+
   // Pre-load brands & categories to minimise DB calls inside the loop
   const [allBrands, allCategories] = await Promise.all([
     db.brand.findMany({ select: { id: true, name: true, slug: true } }),
     db.category.findMany({ select: { id: true, name: true, slug: true, parentId: true } }),
   ]);
 
-  const brandMap = new Map(allBrands.map((b) => [b.name.toLowerCase(), b]));
-  const categoryMap = new Map(allCategories.map((c) => [c.name.toLowerCase(), c]));
+  const brandMap = new Map(allBrands.map((b) => [normalizeLookup(b.name), b]));
+  const categoryMap = new Map(allCategories.map((c) => [normalizeLookup(c.name), c]));
 
   // Ensure fallback category exists
-  let fallbackCategory = categoryMap.get('sin categoria');
+  const fallbackCategoryKey = normalizeLookup('Sin categoria');
+  let fallbackCategory = categoryMap.get(fallbackCategoryKey);
   if (!fallbackCategory) {
     const created = await db.category.upsert({
       where: { slug: 'sin-categoria' },
@@ -87,12 +150,13 @@ export async function POST(request: Request) {
       select: { id: true, name: true, slug: true, parentId: true },
     });
     fallbackCategory = created;
-    categoryMap.set('sin categoria', created);
+    categoryMap.set(fallbackCategoryKey, created);
   }
 
   for (const group of products) {
     try {
-      const { reference, name, description, shortDescription, brand, price, image, variants } = group;
+      const { reference, name, category, description, shortDescription, brand, price, image, variants } = group;
+      const normalizedImagePath = normalizeProductImagePath(image);
 
       if (!name) { result.errors.push(`Ref ${reference}: nombre vacío`); continue; }
       if (!reference) { result.errors.push(`"${name}": referencia vacía`); continue; }
@@ -100,23 +164,56 @@ export async function POST(request: Request) {
       // ── Auto-create brand ───────────────────────────────────────────────
       let brandId: string | null = null;
       if (brand) {
-        let existing = brandMap.get(brand.toLowerCase());
+        const brandKey = normalizeLookup(brand);
+        let existing = brandMap.get(brandKey);
         if (!existing) {
           let slug = toSlug(brand);
-          const slugTaken = await db.brand.findUnique({ where: { slug } });
-          if (slugTaken) slug = `${slug}-${Date.now()}`;
-          const created = await db.brand.create({ data: { name: brand, slug } });
-          existing = { id: created.id, name: created.name, slug: created.slug };
-          brandMap.set(brand.toLowerCase(), existing);
+          if (!slug) slug = `marca-${Date.now()}`;
+          const persisted = await db.brand.upsert({
+            where: { slug },
+            update: {},
+            create: { name: brand.trim(), slug },
+            select: { id: true, name: true, slug: true },
+          });
+          existing = { id: persisted.id, name: persisted.name, slug: persisted.slug };
+          brandMap.set(brandKey, existing);
         }
         brandId = existing.id;
       }
 
       const productPrice = parseCurrency(price);
-      const categoryId = fallbackCategory.id;
+      let categoryId = fallbackCategory.id;
+
+      // ── Auto-create category from CSV column ───────────────────────────
+      if (category) {
+        const categoryKey = normalizeLookup(category);
+        if (categoryKey) {
+          let existingCategory = categoryMap.get(categoryKey);
+          if (!existingCategory) {
+            let categorySlug = toSlug(category);
+            if (!categorySlug) categorySlug = `categoria-${Date.now()}`;
+            const persistedCategory = await db.category.upsert({
+              where: { slug: categorySlug },
+              update: {},
+              create: { name: category.trim(), slug: categorySlug, isActive: true },
+              select: { id: true, name: true, slug: true, parentId: true },
+            });
+            existingCategory = persistedCategory;
+            categoryMap.set(categoryKey, existingCategory);
+          }
+          categoryId = existingCategory.id;
+        }
+      }
 
       // ── Create or update product ────────────────────────────────────────
-      const existingProduct = await db.product.findUnique({ where: { sku: reference } });
+      const existingProduct = await db.product.findFirst({
+        where: {
+          sku: {
+            equals: reference,
+            mode: 'insensitive',
+          },
+        },
+      });
       let targetProductId: string;
 
       if (existingProduct) {
@@ -134,10 +231,10 @@ export async function POST(request: Request) {
             categoryId,
             brandId,
             price: productPrice,
-            ...(image && {
+            ...(normalizedImagePath && {
               images: {
                 deleteMany: {},
-                create: [{ imagePath: image, isPrimary: true, sortOrder: 0 }],
+                create: [{ imagePath: normalizedImagePath, isPrimary: true, sortOrder: 0 }],
               },
             }),
           },
@@ -159,9 +256,9 @@ export async function POST(request: Request) {
             categoryId,
             brandId,
             price: productPrice,
-            ...(image && {
+            ...(normalizedImagePath && {
               images: {
-                create: [{ imagePath: image, isPrimary: true, sortOrder: 0 }],
+                create: [{ imagePath: normalizedImagePath, isPrimary: true, sortOrder: 0 }],
               },
             }),
           },

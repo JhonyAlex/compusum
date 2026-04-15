@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircle, Sparkles, Package } from "lucide-react";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import { formatPrice } from "@/lib/format";
 import {
   resolveBrandName,
@@ -79,7 +79,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
       <Card className="group overflow-hidden border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all duration-200 bg-white">
         <div className="flex gap-3 p-3">
           <div className="relative w-20 h-20 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden">
-            <Image
+            <SafeProductImage
               src={resolveProductImageSrc(product.slug, "100/100")}
               alt={productName}
               fill
@@ -114,7 +114,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-slate-50">
         <Link href={`/producto/${productSlug}`}>
-          <Image
+          <SafeProductImage
             src={resolveProductImageSrc(product.slug, "400/400")}
             alt={productName}
             fill

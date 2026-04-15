@@ -35,3 +35,23 @@ export function resolveBrandLogoSrc(logo: unknown, brandSlug: unknown, size: str
   const safeBrandSlug = resolveBrandSlug(brandSlug);
   return `https://picsum.photos/seed/${safeBrandSlug}/${size}`;
 }
+
+export function normalizeProductImagePath(imagePath: unknown): string {
+  if (!isNonEmptyString(imagePath)) {
+    return "";
+  }
+
+  const value = imagePath.trim();
+  if (
+    value.startsWith("http://")
+    || value.startsWith("https://")
+    || value.startsWith("data:")
+    || value.startsWith("blob:")
+    || value.startsWith("/")
+  ) {
+    return value;
+  }
+
+  const filenameOnly = value.replace(/^.*[\\/]/, "");
+  return `/uploads/${filenameOnly}`;
+}

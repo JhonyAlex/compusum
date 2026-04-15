@@ -7,6 +7,7 @@
 export const PRODUCT_FIELDS = [
   { key: 'reference', label: 'Referencia / SKU', required: true, description: 'Agrupa filas en un solo producto' },
   { key: 'name', label: 'Nombre del producto', required: true, description: 'Nombre visible en la tienda' },
+  { key: 'category', label: 'Categoría', required: false, description: 'Categoría principal del producto' },
   { key: 'description', label: 'Descripción', required: false, description: 'Descripción larga del producto' },
   { key: 'shortDescription', label: 'Descripción corta', required: false, description: 'Resumen o texto breve' },
   { key: 'brand', label: 'Marca', required: false, description: 'Nombre de la marca' },
@@ -27,6 +28,7 @@ export type FieldMapping = Partial<Record<ProductFieldKey, string>>;
 const COLUMN_HINTS: Record<ProductFieldKey, string[]> = {
   reference: ['referencia', 'sku', 'ref', 'código', 'codigo', 'code'],
   name: ['nombre', 'name', 'producto', 'product'],
+  category: ['categoría', 'categoria', 'category'],
   description: ['desc. item', 'descripcion larga', 'description', 'descripcion'],
   shortDescription: ['descripcion corta', 'short description', 'resumen'],
   brand: ['marca', 'brand'],
@@ -67,6 +69,7 @@ export interface VariantRow {
 export interface ProductGroup {
   reference: string;
   name: string;
+  category: string;
   description: string;
   shortDescription: string;
   brand: string;
@@ -84,6 +87,10 @@ function parseCurrencyClient(value?: string): number | null {
   if (!normalized) return null;
   const parsed = parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeReferenceKey(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function normalizeVariantName(value: string): string {
@@ -127,7 +134,11 @@ export function groupRowsIntoProducts(
   skipNoSubirVariants: boolean = true,
 ): GroupResult {
   const errors: string[] = [];
-  const grouped = new Map<string, { baseRow: Record<string, string>; allRows: Record<string, string>[] }>();
+  const grouped = new Map<string, {
+    reference: string;
+    baseRow: Record<string, string>;
+    allRows: Record<string, string>[];
+  }>();
 
   // Step 1: Group rows by reference
   for (let i = 0; i < rows.length; i++) {
@@ -138,11 +149,13 @@ export function groupRowsIntoProducts(
       continue;
     }
 
-    const existing = grouped.get(ref);
+    const refKey = normalizeReferenceKey(ref);
+
+    const existing = grouped.get(refKey);
     if (existing) {
       existing.allRows.push(row);
     } else {
-      grouped.set(ref, { baseRow: row, allRows: [row] });
+      grouped.set(refKey, { reference: ref, baseRow: row, allRows: [row] });
     }
   }
 
@@ -152,7 +165,7 @@ export function groupRowsIntoProducts(
   let totalVariants = 0;
   let productsWithVariants = 0;
 
-  for (const [ref, { baseRow, allRows }] of grouped) {
+  for (const [, { reference, baseRow, allRows }] of grouped) {
     const getField = (key: ProductFieldKey) => {
       const col = mapping[key];
       return col ? baseRow[col]?.trim() ?? '' : '';
@@ -160,7 +173,7 @@ export function groupRowsIntoProducts(
 
     const name = getField('name');
     if (!name) {
-      errors.push(`Referencia ${ref}: nombre vacío, se omite`);
+      errors.push(`Referencia ${reference}: nombre vacío, se omite`);
       continue;
     }
 
@@ -210,8 +223,9 @@ export function groupRowsIntoProducts(
     }
 
     products.push({
-      reference: ref,
+      reference,
       name,
+      category: getField('category'),
       description: getField('description'),
       shortDescription: getField('shortDescription'),
       brand: getField('brand'),
