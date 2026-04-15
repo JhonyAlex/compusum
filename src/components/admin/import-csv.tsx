@@ -73,6 +73,7 @@ export function ImportadorCSV() {
   const [mapping, setMapping] = useState<FieldMapping>({});
   const [duplicateMode, setDuplicateMode] = useState<DuplicateMode>("skip");
   const [skipGeneric, setSkipGeneric] = useState(true);
+  const [skipNoSubir, setSkipNoSubir] = useState(true);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -90,8 +91,8 @@ export function ImportadorCSV() {
   // ── derived: grouped products (computed when on preview/importing) ─────
   const groupResult: GroupResult | null = useMemo(() => {
     if (rows.length === 0 || !mapping.reference) return null;
-    return groupRowsIntoProducts(rows, mapping, skipGeneric);
-  }, [rows, mapping, skipGeneric]);
+    return groupRowsIntoProducts(rows, mapping, skipGeneric, skipNoSubir);
+  }, [rows, mapping, skipGeneric, skipNoSubir]);
 
   // ── mapping validation ────────────────────────────────────────────────────
   const mappingValid = useMemo(() => {
@@ -146,7 +147,7 @@ export function ImportadorCSV() {
   useEffect(() => {
     setPreflightRun(false);
     setPreflightAccepted(false);
-  }, [mapping, skipGeneric, rows]);
+  }, [mapping, skipGeneric, skipNoSubir, rows]);
 
   // ── file handling ─────────────────────────────────────────────────────────
   const handleFile = useCallback(async (f: File) => {
@@ -574,7 +575,20 @@ export function ImportadorCSV() {
                       className="rounded border-slate-300"
                     />
                     <span className="text-sm text-slate-700">
-                      Omitir variación "Genérico" o "No subir" en productos con una sola fila
+                      Omitir variación "Genérico" en productos con una sola fila
+                    </span>
+                  </label>
+
+                  {/* Skip No subir */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={skipNoSubir}
+                      onChange={(e) => setSkipNoSubir(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    <span className="text-sm text-slate-700">
+                      Omitir variación "No subir" en productos con una sola fila
                     </span>
                   </label>
                 </div>

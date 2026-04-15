@@ -97,7 +97,11 @@ function normalizeVariantName(value: string): string {
 
 function isGenericVariant(name: string): boolean {
   const n = normalizeVariantName(name);
-  return n === 'gn' || n === 'generico' || n === 'no subir';
+  return n === 'gn' || n === 'generico';
+}
+
+function isNoSubirVariant(name: string): boolean {
+  return normalizeVariantName(name) === 'no subir';
 }
 
 // ─── Group CSV rows into products ─────────────────────────────────────────────
@@ -120,6 +124,7 @@ export function groupRowsIntoProducts(
   rows: Record<string, string>[],
   mapping: FieldMapping,
   skipGenericVariants: boolean = true,
+  skipNoSubirVariants: boolean = true,
 ): GroupResult {
   const errors: string[] = [];
   const grouped = new Map<string, { baseRow: Record<string, string>; allRows: Record<string, string>[] }>();
@@ -176,10 +181,9 @@ export function groupRowsIntoProducts(
 
       if (!rawVName) continue;
 
-      // Skip generic variants if configured and all variants are generic
-      if (skipGenericVariants && isGenericVariant(rawVName) && allRows.length === 1) {
-        continue;
-      }
+      // Skip generic/no-subir variants if configured (only when the product has a single row)
+      if (skipGenericVariants && isGenericVariant(rawVName) && allRows.length === 1) continue;
+      if (skipNoSubirVariants && isNoSubirVariant(rawVName) && allRows.length === 1) continue;
 
       // Deduplicate by normalized name (combine codes)
       const normalized = normalizeVariantName(rawVName);
@@ -196,7 +200,7 @@ export function groupRowsIntoProducts(
       variants.push({ name: displayName, code: vCode, price: vPrice, stock: vStock });
     }
 
-    if (skipGenericVariants && allRows.length === 1 && variants.length === 0) {
+    if ((skipGenericVariants || skipNoSubirVariants) && allRows.length === 1 && variants.length === 0) {
       skippedGenericOnly++;
     }
 
