@@ -8,6 +8,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircle, Sparkles, Package } from "lucide-react";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
 import { formatPrice } from "@/lib/format";
+import {
+  resolveBrandName,
+  resolveBrandSlug,
+  resolveProductImageSrc,
+  resolveProductName,
+  resolveProductSlug,
+} from "@/lib/product-fallbacks";
 import type { CartProduct } from "@/stores/cart-store";
 
 interface Product {
@@ -22,6 +29,7 @@ interface Product {
   isFeatured: boolean;
   isNew: boolean;
   catalogMode?: boolean;
+  variantCount?: number;
   brand?: {
     name: string;
     slug: string;
@@ -41,7 +49,13 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, variant = "default", globalCatalogMode = false }: ProductCardProps) {
-  const whatsappMessage = `Hola, quiero cotizar: ${product.name}${product.sku ? ` (Ref: ${product.sku})` : ""}`;
+  const productName = resolveProductName(product.name);
+  const productSlug = resolveProductSlug(product.slug);
+  const brandName = resolveBrandName(product.brand?.name);
+  const brandSlug = resolveBrandSlug(product.brand?.slug);
+  const hasBrandLink = Boolean(product.brand?.name || product.brand?.slug);
+
+  const whatsappMessage = `Hola, quiero cotizar: ${productName}${product.sku ? ` (Ref: ${product.sku})` : ""}`;
   const whatsappUrl = `https://wa.me/576063335206?text=${encodeURIComponent(whatsappMessage)}`;
 
   // Resolve catalog mode: product > category > brand > global
@@ -58,6 +72,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
   };
 
   const config = stockStatusConfig[product.stockStatus as keyof typeof stockStatusConfig] || stockStatusConfig.disponible;
+  const hasVariants = (product.variantCount ?? 0) > 0;
 
   if (variant === "compact") {
     return (
@@ -65,20 +80,18 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
         <div className="flex gap-3 p-3">
           <div className="relative w-20 h-20 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden">
             <Image
-              src={`https://picsum.photos/seed/${product.slug}/100/100`}
-              alt={product.name}
+              src={resolveProductImageSrc(product.slug, "100/100")}
+              alt={productName}
               fill
               className="object-cover group-hover:scale-105 transition-transform duration-300"
               sizes="80px"
             />
           </div>
           <div className="flex-1 min-w-0">
-            {product.brand && (
-              <p className="text-xs text-slate-400">{product.brand.name}</p>
-            )}
-            <Link href={`/producto/${product.slug}`}>
+            <p className="text-xs text-slate-400">{brandName}</p>
+            <Link href={`/producto/${productSlug}`}>
               <h3 className="font-medium text-slate-900 text-sm line-clamp-2 hover:text-primary transition-colors">
-                {product.name}
+                {productName}
               </h3>
             </Link>
             {isCatalogMode ? (
@@ -100,10 +113,10 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
     <Card className="group overflow-hidden border border-slate-200 hover:border-slate-300 hover:shadow-lg transition-all duration-300 bg-white">
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-slate-50">
-        <Link href={`/producto/${product.slug}`}>
+        <Link href={`/producto/${productSlug}`}>
           <Image
-            src={`https://picsum.photos/seed/${product.slug}/400/400`}
-            alt={product.name}
+            src={resolveProductImageSrc(product.slug, "400/400")}
+            alt={productName}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-500"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
@@ -135,19 +148,21 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
 
       <CardContent className="p-4">
         {/* Brand */}
-        {product.brand && (
-          <Link 
-            href={`/catalogo?marca=${product.brand.slug}`}
+        {hasBrandLink ? (
+          <Link
+            href={`/catalogo?marca=${brandSlug}`}
             className="text-xs text-slate-400 hover:text-primary transition-colors"
           >
-            {product.brand.name}
+            {brandName}
           </Link>
+        ) : (
+          <p className="text-xs text-slate-400">{brandName}</p>
         )}
 
         {/* Product Name */}
-        <Link href={`/producto/${product.slug}`}>
+        <Link href={`/producto/${productSlug}`}>
           <h3 className="font-medium text-slate-900 mt-1 line-clamp-2 hover:text-primary transition-colors text-sm">
-            {product.name}
+            {productName}
           </h3>
         </Link>
 
@@ -183,15 +198,28 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
               Consultar precio
             </p>
           )}
+          {hasVariants && (
+            <p className="text-xs text-slate-500 mt-1">
+              {product.variantCount} variaciones disponibles
+            </p>
+          )}
         </div>
 
         {/* CTA Buttons */}
         <div className="flex gap-2 mt-4">
-          <AddToCartButton
-            product={product as CartProduct}
-            variant="icon"
-            className="flex-1"
-          />
+          {hasVariants ? (
+            <Button asChild size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs h-9">
+              <Link href={`/producto/${productSlug}`}>
+                Elegir variacion
+              </Link>
+            </Button>
+          ) : (
+            <AddToCartButton
+              product={product as CartProduct}
+              variant="icon"
+              className="flex-1"
+            />
+          )}
           <Button
             asChild
             size="sm"
@@ -208,3 +236,4 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
     </Card>
   );
 }
+

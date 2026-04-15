@@ -29,6 +29,9 @@ export function useCartRestore() {
 
         const serverItems: CartItem[] = data.data.items.map(
           (ci: {
+            variantId?: string | null;
+            variantName?: string | null;
+            variantCode?: string | null;
             quantity: number;
             product: {
               id: string;
@@ -48,6 +51,9 @@ export function useCartRestore() {
               name: ci.product.name,
               slug: ci.product.slug,
               sku: ci.product.sku,
+              variantId: ci.variantId ?? null,
+              variantName: ci.variantName ?? null,
+              variantCode: ci.variantCode ?? null,
               price: ci.product.price,
               wholesalePrice: ci.product.wholesalePrice,
               minWholesaleQty: ci.product.minWholesaleQty ?? 1,

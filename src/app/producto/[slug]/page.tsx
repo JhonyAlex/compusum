@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import Image from "next/image";
-import { notFound } from "next/navigation";
 import {
   MessageCircle,
   Star,
@@ -22,6 +21,14 @@ import { formatPrice } from "@/lib/format";
 import { resolveCatalogMode } from "@/lib/catalog-mode";
 import { getCachedProductBySlug, getCachedGlobalCatalogMode } from "@/lib/product-cache";
 import { ViewCountTracker } from "@/components/store/view-count-tracker";
+import {
+  resolveBrandLogoSrc,
+  resolveBrandName,
+  resolveBrandSlug,
+  resolveProductImageSrc,
+  resolveProductName,
+  resolveProductSlug,
+} from "@/lib/product-fallbacks";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -57,7 +64,42 @@ export default async function ProductDetailPage({ params }: PageProps) {
   }
 
   if (!product || !product.isActive) {
-    notFound();
+    return (
+      <div className="min-h-screen flex flex-col bg-white">
+        <Header />
+        <main className="flex-1">
+          <section className="py-16 md:py-24">
+            <div className="container mx-auto px-4 max-w-2xl text-center">
+              <Badge className="mb-4 bg-slate-100 text-slate-700 hover:bg-slate-100">Producto no disponible</Badge>
+              <h1 className="font-heading text-3xl md:text-4xl font-bold text-foreground mb-3">
+                Este producto no existe o ya no está activo
+              </h1>
+              <p className="text-gray-600 mb-8">
+                Te ayudamos a encontrar una alternativa con disponibilidad inmediata.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link
+                  href="/catalogo"
+                  className="inline-flex items-center justify-center h-11 px-6 rounded-md bg-primary text-white hover:bg-primary/90 transition-colors"
+                >
+                  Ver catálogo
+                </Link>
+                <a
+                  href="https://wa.me/576063335206?text=Hola%2C%20estoy%20buscando%20un%20producto%20que%20no%20aparece%20en%20la%20tienda."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center h-11 px-6 rounded-md border border-green-200 text-green-700 hover:bg-green-50 transition-colors"
+                >
+                  Consultar por WhatsApp
+                </a>
+              </div>
+            </div>
+          </section>
+        </main>
+        <Footer />
+        <WhatsAppButton />
+      </div>
+    );
   }
 
   // Resolve catalog mode for this product
@@ -76,7 +118,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
   );
 
   // Get related products
-  let relatedProducts: Awaited<ReturnType<typeof db.product.findMany<{ include: { brand: true; category: true } }>>> = [];
+  let relatedProducts: Awaited<ReturnType<typeof db.product.findMany<{
+    include: { brand: true; category: true; _count: { select: { variants: true } } };
+  }>>> = [];
 
   try {
     relatedProducts = await db.product.findMany({
@@ -85,7 +129,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
         isActive: true,
         id: { not: product.id }
       },
-      include: { brand: true, category: true },
+      include: {
+        brand: true,
+        category: true,
+        _count: { select: { variants: { where: { isActive: true } } } },
+      },
       take: 4
     });
   } catch (error) {
@@ -103,6 +151,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
     agotado: "Agotado",
     por_pedido: "Bajo pedido"
   };
+
+  const productName = resolveProductName(product.name);
+  const productSlug = resolveProductSlug(product.slug);
+  const brandName = resolveBrandName(product.brand?.name);
+  const brandSlug = resolveBrandSlug(product.brand?.slug);
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -128,7 +181,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 {product.category?.name}
               </Link>
               <ChevronRight className="h-4 w-4 text-gray-400" />
-              <span className="text-foreground font-medium truncate">{product.name}</span>
+              <span className="text-foreground font-medium truncate">{productName}</span>
             </nav>
           </div>
         </div>
@@ -141,8 +194,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
               <div className="space-y-4">
                 <div className="relative aspect-square bg-gray-50 rounded-2xl overflow-hidden">
                   <Image
-                    src={`https://picsum.photos/seed/${product.slug}/800/800`}
-                    alt={product.name}
+                    src={resolveProductImageSrc(product.slug, "800/800")}
+                    alt={productName}
                     fill
                     className="object-cover"
                     priority
@@ -172,8 +225,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                     >
                       <Image
-                        src={`https://picsum.photos/seed/${product.slug}-${i}/200/200`}
-                        alt={`${product.name} - Imagen ${i}`}
+                        src={resolveProductImageSrc(`${productSlug}-${i}`, "200/200")}
+                        alt={`${productName} - Imagen ${i}`}
                         width={100}
                         height={100}
                         className="object-cover w-full h-full"
@@ -188,23 +241,23 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 {/* Brand */}
                 {product.brand && (
                   <Link 
-                    href={`/marcas/${product.brand.slug}`}
+                    href={`/marcas/${brandSlug}`}
                     className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-primary"
                   >
                     <div className="w-8 h-8 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
                       <img
-                        src={product.brand.logo || `https://picsum.photos/seed/${product.brand.slug}/32/32`}
-                        alt={product.brand.name}
+                        src={resolveBrandLogoSrc(product.brand.logo, product.brand.slug, "32/32")}
+                        alt={brandName}
                         className="w-full h-full object-contain p-0.5"
                       />
                     </div>
-                    {product.brand.name}
+                    {brandName}
                   </Link>
                 )}
 
                 {/* Name */}
                 <h1 className="font-heading text-3xl md:text-4xl font-bold text-foreground">
-                  {product.name}
+                  {productName}
                 </h1>
 
                 {/* SKU & Stock */}
@@ -217,6 +270,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   <Badge className={`${stockStatusColors[product.stockStatus as keyof typeof stockStatusColors]} text-white`}>
                     {stockStatusLabels[product.stockStatus as keyof typeof stockStatusLabels]}
                   </Badge>
+                  {(product.variants?.length ?? 0) > 0 && (
+                    <Badge variant="outline" className="border-primary/40 text-primary">
+                      {(product.variants?.length ?? 0)} variaciones
+                    </Badge>
+                  )}
                 </div>
 
                 {/* Prices */}
@@ -276,6 +334,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     stockStatus: product.stockStatus,
                     brand: product.brand ? { name: product.brand.name, slug: product.brand.slug } : null,
                     category: product.category ? { name: product.category.name, slug: product.category.slug } : null,
+                    variants:
+                      product.variants?.map((variant) => ({
+                        id: variant.id,
+                        name: variant.name,
+                        code: variant.code,
+                        price: variant.price,
+                        wholesalePrice: variant.wholesalePrice,
+                        stockStatus: variant.stockStatus,
+                      })) ?? [],
                   }}
                   catalogMode={productCatalogMode}
                 />
@@ -321,7 +388,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       <p>{product.description}</p>
                     ) : (
                       <p className="text-gray-500">
-                        {product.name} - Producto de alta calidad de la marca {product.brand?.name || "reconocida"}. 
+                        {productName} - Producto de alta calidad de la marca {brandName.toLowerCase()}. 
                         Ideal para uso escolar y de oficina.
                       </p>
                     )}
@@ -365,7 +432,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                 {relatedProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} globalCatalogMode={globalCatalogMode} />
+                  <ProductCard
+                    key={p.id}
+                    product={{ ...p, variantCount: p._count.variants }}
+                    globalCatalogMode={globalCatalogMode}
+                  />
                 ))}
               </div>
             </div>

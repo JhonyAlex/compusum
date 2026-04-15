@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useCatalogMode } from "@/hooks/use-catalog-mode";
 import { useCartStore, type CartProduct } from "@/stores/cart-store";
 import { formatPrice } from "@/lib/format";
+import { resolveProductImageSrc, resolveProductName, resolveProductSlug } from "@/lib/product-fallbacks";
 import { toast } from "sonner";
 
 interface CrossSellProduct {
@@ -54,11 +55,12 @@ export function CrossSellSection() {
     const cartProductIds = new Set(items.map((i) => i.product.id));
 
     setLoading(true);
-    fetch(`/api/products?categoria=${categorySlug}&limit=6`)
+    fetch(`/api/products?category=${categorySlug}&limit=6`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.success && data.data) {
-          const filtered = data.data
+        const fetchedProducts = data?.data?.products;
+        if (data?.success && Array.isArray(fetchedProducts)) {
+          const filtered = fetchedProducts
             .filter((p: CrossSellProduct) => !cartProductIds.has(p.id))
             .slice(0, 3);
           setSuggestions(filtered);
@@ -72,7 +74,7 @@ export function CrossSellSection() {
 
   const handleAdd = (product: CrossSellProduct) => {
     addItem(product as CartProduct, 1);
-    toast.success("Producto agregado", { description: product.name });
+    toast.success("Producto agregado", { description: resolveProductName(product.name) });
     setSuggestions((prev) => prev.filter((p) => p.id !== product.id));
   };
 
@@ -82,12 +84,16 @@ export function CrossSellSection() {
         Te podría interesar
       </p>
       <div className="space-y-2">
-        {suggestions.map((product) => (
+        {suggestions.map((product) => {
+          const productName = resolveProductName(product.name);
+          const productSlug = resolveProductSlug(product.slug);
+
+          return (
           <div key={product.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 transition-colors">
             <div className="relative w-10 h-10 flex-shrink-0 bg-slate-50 rounded overflow-hidden">
               <Image
-                src={`https://picsum.photos/seed/${product.slug}/60/60`}
-                alt={product.name}
+                src={resolveProductImageSrc(product.slug, "60/60")}
+                alt={productName}
                 fill
                 className="object-cover"
                 sizes="40px"
@@ -95,10 +101,10 @@ export function CrossSellSection() {
             </div>
             <div className="flex-1 min-w-0">
               <Link
-                href={`/producto/${product.slug}`}
+                href={`/producto/${productSlug}`}
                 className="text-xs text-slate-700 hover:text-blue-600 line-clamp-1 transition-colors"
               >
-                {product.name}
+                {productName}
               </Link>
               {catalogMode ? (
                 <p className="text-xs font-medium text-slate-500 italic">Consultar precio</p>
@@ -113,12 +119,13 @@ export function CrossSellSection() {
               size="icon"
               className="h-7 w-7 text-blue-600 hover:bg-blue-50"
               onClick={() => handleAdd(product)}
-              aria-label={`Agregar ${product.name} al carrito`}
+              aria-label={`Agregar ${productName} al carrito`}
             >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

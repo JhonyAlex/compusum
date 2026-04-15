@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useCatalogMode } from "@/hooks/use-catalog-mode";
 import { useCartStore, type CartProduct } from "@/stores/cart-store";
 import { formatPrice } from "@/lib/format";
+import { resolveProductImageSrc, resolveProductName, resolveProductSlug } from "@/lib/product-fallbacks";
 import { toast } from "sonner";
 
 interface FeaturedProduct {
@@ -36,8 +37,9 @@ export function CartFeaturedProducts() {
     fetch("/api/products?featured=true&limit=6")
       .then((r) => r.json())
       .then((data) => {
-        if (data.success && data.data) {
-          setProducts(data.data.slice(0, 4));
+        const fetchedProducts = data?.data?.products;
+        if (data?.success && Array.isArray(fetchedProducts)) {
+          setProducts(fetchedProducts.slice(0, 4));
         }
       })
       .catch(() => {})
@@ -66,7 +68,7 @@ export function CartFeaturedProducts() {
 
   const handleAdd = (product: FeaturedProduct) => {
     addItem(product as CartProduct, 1);
-    toast.success("Producto agregado", { description: product.name });
+    toast.success("Producto agregado", { description: resolveProductName(product.name) });
   };
 
   return (
@@ -75,47 +77,52 @@ export function CartFeaturedProducts() {
         Productos destacados
       </p>
       <div className="space-y-2">
-        {products.map((product) => (
-          <div
-            key={product.id}
-            className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-100 hover:border-blue-100 hover:bg-slate-50 transition-colors"
-          >
-            <div className="relative w-12 h-12 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden">
-              <Image
-                src={`https://picsum.photos/seed/${product.slug}/60/60`}
-                alt={product.name}
-                fill
-                className="object-cover"
-                sizes="48px"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <Link
-                href={`/producto/${product.slug}`}
-                onClick={() => setOpen(false)}
-                className="text-xs font-medium text-slate-800 hover:text-blue-600 line-clamp-2 leading-snug transition-colors"
-              >
-                {product.name}
-              </Link>
-              {catalogMode ? (
-                <p className="text-xs text-slate-400 italic mt-0.5">Consultar precio</p>
-              ) : (
-                <p className="text-xs font-semibold text-blue-600 mt-0.5">
-                  {formatPrice(product.wholesalePrice || product.price)}
-                </p>
-              )}
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:border-blue-300 flex-shrink-0"
-              onClick={() => handleAdd(product)}
-              aria-label={`Agregar ${product.name} al carrito`}
+        {products.map((product) => {
+          const productName = resolveProductName(product.name);
+          const productSlug = resolveProductSlug(product.slug);
+
+          return (
+            <div
+              key={product.id}
+              className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-100 hover:border-blue-100 hover:bg-slate-50 transition-colors"
             >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
+              <div className="relative w-12 h-12 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden">
+                <Image
+                  src={resolveProductImageSrc(product.slug, "60/60")}
+                  alt={productName}
+                  fill
+                  className="object-cover"
+                  sizes="48px"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <Link
+                  href={`/producto/${productSlug}`}
+                  onClick={() => setOpen(false)}
+                  className="text-xs font-medium text-slate-800 hover:text-blue-600 line-clamp-2 leading-snug transition-colors"
+                >
+                  {productName}
+                </Link>
+                {catalogMode ? (
+                  <p className="text-xs text-slate-400 italic mt-0.5">Consultar precio</p>
+                ) : (
+                  <p className="text-xs font-semibold text-blue-600 mt-0.5">
+                    {formatPrice(product.wholesalePrice || product.price)}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:border-blue-300 flex-shrink-0"
+                onClick={() => handleAdd(product)}
+                aria-label={`Agregar ${productName} al carrito`}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        })}
       </div>
       <Button
         asChild

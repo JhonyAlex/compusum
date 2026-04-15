@@ -21,7 +21,10 @@ export function ShareCartMenu() {
     let text = "Mi carrito CompuSum:\n\n";
     items.forEach((item, i) => {
       const price = item.product.wholesalePrice || item.product.price;
-      text += `${i + 1}. ${item.product.name} x${item.quantity}`;
+      const variant = item.product.variantName
+        ? ` [Variacion: ${item.product.variantName}]`
+        : "";
+      text += `${i + 1}. ${item.product.name}${variant} x${item.quantity}`;
       if (price) text += ` - ${formatPrice(price * item.quantity)}`;
       text += "\n";
     });

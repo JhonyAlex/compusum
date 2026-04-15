@@ -6,6 +6,9 @@ export interface CartProduct {
   name: string;
   slug: string;
   sku: string | null;
+  variantId?: string | null;
+  variantName?: string | null;
+  variantCode?: string | null;
   price: number | null;
   wholesalePrice: number | null;
   minWholesaleQty: number;
@@ -46,8 +49,8 @@ interface CartState {
 
   // Actions
   addItem: (product: CartProduct, quantity?: number) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  removeItem: (itemKey: string) => void;
+  updateQuantity: (itemKey: string, quantity: number) => void;
   clearCart: () => void;
   setOpen: (open: boolean) => void;
   setCheckoutOpen: (open: boolean) => void;
@@ -57,6 +60,9 @@ interface CartState {
   /** Persiste el carrito actual en el servidor (fire-and-forget, sin bloquear UI). */
   syncToServer: () => Promise<void>;
 }
+
+export const getCartItemKey = (productId: string, variantId?: string | null) =>
+  `${productId}::${variantId ?? "base"}`;
 
 export const useCartStore = create<CartState>()(
   persist(
@@ -69,12 +75,15 @@ export const useCartStore = create<CartState>()(
 
       addItem: (product, quantity = 1) => {
         const { items } = get();
-        const existing = items.find((item) => item.product.id === product.id);
+        const incomingKey = getCartItemKey(product.id, product.variantId);
+        const existing = items.find(
+          (item) => getCartItemKey(item.product.id, item.product.variantId) === incomingKey
+        );
 
         if (existing) {
           set({
             items: items.map((item) =>
-              item.product.id === product.id
+              getCartItemKey(item.product.id, item.product.variantId) === incomingKey
                 ? { ...item, quantity: item.quantity + quantity }
                 : item
             ),
@@ -84,18 +93,24 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      removeItem: (productId) => {
-        set({ items: get().items.filter((item) => item.product.id !== productId) });
+      removeItem: (itemKey) => {
+        set({
+          items: get().items.filter(
+            (item) => getCartItemKey(item.product.id, item.product.variantId) !== itemKey
+          ),
+        });
       },
 
-      updateQuantity: (productId, quantity) => {
+      updateQuantity: (itemKey, quantity) => {
         if (quantity < 1) {
-          get().removeItem(productId);
+          get().removeItem(itemKey);
           return;
         }
         set({
           items: get().items.map((item) =>
-            item.product.id === productId ? { ...item, quantity } : item
+            getCartItemKey(item.product.id, item.product.variantId) === itemKey
+              ? { ...item, quantity }
+              : item
           ),
         });
       },
@@ -122,6 +137,9 @@ export const useCartStore = create<CartState>()(
         const body = {
           items: items.map((item) => ({
             productId: item.product.id,
+            variantId: item.product.variantId ?? undefined,
+            variantName: item.product.variantName ?? undefined,
+            variantCode: item.product.variantCode ?? undefined,
             quantity: item.quantity,
             unitPrice:
               item.product.wholesalePrice ?? item.product.price ?? undefined,

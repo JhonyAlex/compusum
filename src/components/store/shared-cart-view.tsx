@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/stores/cart-store";
 import { formatPrice } from "@/lib/format";
+import { resolveProductImageSrc, resolveProductName, resolveProductSlug } from "@/lib/product-fallbacks";
 import { toast } from "sonner";
 
 interface SharedCartItem {
@@ -30,6 +31,9 @@ interface SharedCartItem {
     name: string;
     slug: string;
     sku: string | null;
+    variantId?: string | null;
+    variantName?: string | null;
+    variantCode?: string | null;
     price: number | null;
     wholesalePrice: number | null;
     minWholesaleQty: number;
@@ -101,7 +105,10 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
     cart.items.forEach((item, i) => {
       const price = item.unitPrice || item.product.wholesalePrice || item.product.price || 0;
       const ref = item.product.sku ? ` (Ref: ${item.product.sku})` : "";
-      msg += `${i + 1}. ${item.product.name}${ref} x${item.quantity}`;
+      const variant = item.product.variantName
+        ? ` [Variacion: ${item.product.variantName}]`
+        : "";
+      msg += `${i + 1}. ${resolveProductName(item.product.name)}${ref}${variant} x${item.quantity}`;
       if (!catalogMode && price) msg += ` - ${formatPrice(price)} c/u`;
       msg += "\n";
     });
@@ -180,12 +187,14 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
         <CardContent className="p-0">
           {cart.items.map((item) => {
             const price = item.unitPrice || item.product.wholesalePrice || item.product.price || 0;
+            const productName = resolveProductName(item.product.name);
+            const productSlug = resolveProductSlug(item.product.slug);
             return (
               <div key={item.id} className="flex gap-3 px-4 py-3 border-b border-slate-100 last:border-0">
                 <div className="relative w-14 h-14 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden">
                   <Image
-                    src={`https://picsum.photos/seed/${item.product.slug}/100/100`}
-                    alt={item.product.name}
+                    src={resolveProductImageSrc(item.product.slug, "100/100")}
+                    alt={productName}
                     fill
                     className="object-cover"
                     sizes="56px"
@@ -193,13 +202,16 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
                 </div>
                 <div className="flex-1 min-w-0">
                   <Link
-                    href={`/producto/${item.product.slug}`}
+                    href={`/producto/${productSlug}`}
                     className="text-sm font-medium text-slate-900 hover:text-blue-600 line-clamp-1"
                   >
-                    {item.product.name}
+                    {productName}
                   </Link>
                   {item.product.sku && (
                     <p className="text-[11px] text-slate-400 font-mono">Ref: {item.product.sku}</p>
+                  )}
+                  {item.product.variantName && (
+                    <p className="text-[11px] text-slate-500">Variacion: {item.product.variantName}</p>
                   )}
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-xs text-slate-500">x{item.quantity}</span>

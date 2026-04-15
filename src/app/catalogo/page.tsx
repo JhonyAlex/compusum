@@ -119,6 +119,7 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
       isNew: p.isNew,
       isActive: p.isActive,
       catalogMode: p.catalogMode,
+      variantCount: p.variantCount,
       stockStatus: p.stockStatus,
       sortOrder: p.sortOrder,
       createdAt: p.createdAt,

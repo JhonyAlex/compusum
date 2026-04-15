@@ -17,6 +17,8 @@ export async function getWhatsAppPhone(): Promise<string> {
 export interface CartItemForWhatsApp {
   name: string;
   sku?: string | null;
+  variantName?: string | null;
+  variantCode?: string | null;
   quantity: number;
   unitPrice?: number | null;
 }
@@ -48,8 +50,9 @@ export function generateCartWhatsAppMessage(
 
   items.forEach((item, i) => {
     const ref = item.sku ? ` (Ref: ${item.sku})` : "";
+    const variant = item.variantName ? ` [Variacion: ${item.variantName}]` : "";
     const price = item.unitPrice ? ` - ${formatPrice(item.unitPrice)} c/u` : "";
-    msg += `${i + 1}. ${item.name}${ref} x${item.quantity}${price}\n`;
+    msg += `${i + 1}. ${item.name}${ref}${variant} x${item.quantity}${price}\n`;
     if (item.unitPrice) subtotal += item.unitPrice * item.quantity;
   });
 

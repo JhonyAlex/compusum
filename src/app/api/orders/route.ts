@@ -60,7 +60,10 @@ export async function POST(request: NextRequest) {
       where: { id: cartId },
       include: {
         items: {
-          include: { product: { select: { name: true, sku: true, wholesalePrice: true, price: true } } },
+          include: {
+            product: { select: { name: true, sku: true, wholesalePrice: true, price: true } },
+            variant: { select: { price: true, wholesalePrice: true } },
+          },
         },
       },
     });
@@ -71,7 +74,13 @@ export async function POST(request: NextRequest) {
 
     // Calculate subtotal from cart items
     const subtotal = cart.items.reduce((sum, item) => {
-      const price = item.unitPrice || item.product.wholesalePrice || item.product.price || 0;
+      const price =
+        item.unitPrice ||
+        item.variant?.wholesalePrice ||
+        item.variant?.price ||
+        item.product.wholesalePrice ||
+        item.product.price ||
+        0;
       return sum + price * item.quantity;
     }, 0);
 
@@ -109,8 +118,16 @@ export async function POST(request: NextRequest) {
               productId: item.productId,
               productName: item.product.name,
               productSku: item.product.sku,
+              variantId: item.variantId,
+              variantName: item.variantName,
+              variantCode: item.variantCode,
               quantity: item.quantity,
-              unitPrice: item.unitPrice || item.product.wholesalePrice || item.product.price,
+              unitPrice:
+                item.unitPrice ||
+                item.variant?.wholesalePrice ||
+                item.variant?.price ||
+                item.product.wholesalePrice ||
+                item.product.price,
             })),
           },
           cartId,
@@ -202,8 +219,16 @@ export async function POST(request: NextRequest) {
             productId: item.productId,
             productName: item.product.name,
             productSku: item.product.sku,
+            variantId: item.variantId,
+            variantName: item.variantName,
+            variantCode: item.variantCode,
             quantity: item.quantity,
-            unitPrice: item.unitPrice || item.product.wholesalePrice || item.product.price,
+            unitPrice:
+              item.unitPrice ||
+              item.variant?.wholesalePrice ||
+              item.variant?.price ||
+              item.product.wholesalePrice ||
+              item.product.price,
           })),
         },
         cartId,

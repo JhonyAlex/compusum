@@ -16,6 +16,7 @@ interface Product {
   isFeatured: boolean;
   isNew: boolean;
   catalogMode?: boolean;
+  variantCount?: number;
   brand?: { name: string; slug: string; catalogMode?: boolean } | null;
   category?: { name: string; slug: string; catalogMode?: boolean } | null;
 }
@@ -79,6 +80,7 @@ export function ProductInfiniteList({
           isFeatured: p.isFeatured,
           isNew: p.isNew,
           catalogMode: p.catalogMode,
+          variantCount: p.variantCount,
           brand: p.brandName
             ? { name: p.brandName, slug: p.brandSlug, catalogMode: p.brandCatalogMode }
             : p.brand ?? null,

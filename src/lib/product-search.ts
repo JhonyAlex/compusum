@@ -36,6 +36,7 @@ interface SearchResult {
   primaryImage: string | null;
   primaryThumbnail: string | null;
   primaryAltText: string | null;
+  variantCount: number;
   rank: number;
 }
 
@@ -149,6 +150,11 @@ export async function searchProducts(
       c."name" as "categoryName", c."slug" as "categorySlug", c."catalogMode" as "categoryCatalogMode",
       b."name" as "brandName", b."slug" as "brandSlug", b."catalogMode" as "brandCatalogMode",
       pi."imagePath" as "primaryImage", pi."thumbnailPath" as "primaryThumbnail", pi."altText" as "primaryAltText",
+      (
+        SELECT COUNT(*)::int
+        FROM "ProductVariant" pv
+        WHERE pv."productId" = p."id" AND pv."isActive" = true
+      ) as "variantCount",
       ${rankSelect}
     FROM "Product" p
     LEFT JOIN "Category" c ON c."id" = p."categoryId"

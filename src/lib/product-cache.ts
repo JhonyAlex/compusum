@@ -51,6 +51,10 @@ export const getCachedProductBySlug = (slug: string) =>
           brand: true,
           category: { include: { parent: true } },
           images: { orderBy: { sortOrder: "asc" } },
+          variants: {
+            where: { isActive: true },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          },
         },
       });
     },
@@ -98,6 +102,11 @@ export const getCachedFeaturedProducts = unstable_cache(
           take: 1,
           select: { imagePath: true, thumbnailPath: true, altText: true },
         },
+        _count: {
+          select: {
+            variants: { where: { isActive: true } },
+          },
+        },
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
       take: 8,
@@ -135,6 +144,11 @@ export const getCachedNewProducts = unstable_cache(
           where: { isPrimary: true },
           take: 1,
           select: { imagePath: true, thumbnailPath: true, altText: true },
+        },
+        _count: {
+          select: {
+            variants: { where: { isActive: true } },
+          },
         },
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],

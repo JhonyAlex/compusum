@@ -20,6 +20,7 @@ import { ShareCartMenu } from "@/components/store/share-cart-menu";
 import { formatPrice } from "@/lib/format";
 import Link from "next/link";
 import { useCatalogMode } from "@/hooks/use-catalog-mode";
+import { getCartItemKey } from "@/stores/cart-store";
 
 export function CartSheet() {
   const isOpen = useCartStore((s) => s.isOpen);
@@ -99,7 +100,11 @@ export function CartSheet() {
             <ScrollArea className="flex-1 px-4">
               <div className="py-2">
                 {items.map((item) => (
-                  <CartItemRow key={item.product.id} item={item} hidePrices={catalogMode} />
+                  <CartItemRow
+                    key={getCartItemKey(item.product.id, item.product.variantId)}
+                    item={item}
+                    hidePrices={catalogMode}
+                  />
                 ))}
               </div>
 
@@ -178,7 +183,10 @@ function CartWhatsAppButton() {
     items.forEach((item, i) => {
       const price = item.product.wholesalePrice || item.product.price || 0;
       const ref = item.product.sku ? ` (Ref: ${item.product.sku})` : "";
-      msg += `${i + 1}. ${item.product.name}${ref} x${item.quantity}`;
+      const variant = item.product.variantName
+        ? ` [Variacion: ${item.product.variantName}]`
+        : "";
+      msg += `${i + 1}. ${item.product.name}${ref}${variant} x${item.quantity}`;
       if (price) {
         msg += ` - ${formatPrice(price)} c/u`;
         subtotal += price * item.quantity;

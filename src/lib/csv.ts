@@ -78,6 +78,7 @@ export function parseCSV(raw: string): Record<string, string>[] {
  * Required columns for product import CSV.
  */
 export const REQUIRED_CSV_COLUMNS = ['marca', 'nombre', 'sku', 'precio', 'categoria'];
+export const LEGACY_REQUIRED_CSV_COLUMNS = ['marca', 'nombre', 'referencia', 'precio unitario'];
 
 /**
  * Validate that CSV rows contain all required columns.
@@ -89,5 +90,12 @@ export function validateRequiredColumns(rows: Record<string, string>[]): string[
   if (rows.length === 0) return REQUIRED_CSV_COLUMNS;
   
   const headers = Object.keys(rows[0]).map((k) => k.toLowerCase());
+
+  const hasModernFormat = REQUIRED_CSV_COLUMNS.every((column) => headers.includes(column));
+  if (hasModernFormat) return [];
+
+  const hasLegacyFormat = LEGACY_REQUIRED_CSV_COLUMNS.every((column) => headers.includes(column));
+  if (hasLegacyFormat) return [];
+
   return REQUIRED_CSV_COLUMNS.filter((c) => !headers.includes(c));
 }

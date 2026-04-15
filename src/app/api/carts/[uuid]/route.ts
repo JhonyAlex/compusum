@@ -92,8 +92,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           ? {
               items: {
                 deleteMany: {},
-                create: items.map((item: { productId: string; quantity: number; unitPrice?: number }) => ({
+                create: items.map((item: { productId: string; variantId?: string | null; variantName?: string | null; variantCode?: string | null; quantity: number; unitPrice?: number }) => ({
                   productId: item.productId,
+                  variantId: item.variantId || null,
+                  variantName: item.variantName || null,
+                  variantCode: item.variantCode || null,
                   quantity: item.quantity,
                   unitPrice: item.unitPrice || null,
                 })),

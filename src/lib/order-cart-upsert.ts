@@ -293,6 +293,9 @@ export async function upsertOrder(
       productId: string;
       productName: string;
       productSku?: string | null;
+      variantId?: string | null;
+      variantName?: string | null;
+      variantCode?: string | null;
       quantity: number;
       unitPrice: number | null;
     }>;

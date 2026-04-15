@@ -31,6 +31,9 @@ export interface OrderWebhookPayload {
   items: {
     productName: string;
     productSku: string | null;
+    variantId: string | null;
+    variantName: string | null;
+    variantCode: string | null;
     quantity: number;
     unitPrice: number | null;
     lineTotal: number;
@@ -80,6 +83,9 @@ export async function buildWebhookPayload(orderId: string): Promise<OrderWebhook
     items: order.items.map((i) => ({
       productName: i.productName,
       productSku: i.productSku,
+      variantId: i.variantId,
+      variantName: i.variantName,
+      variantCode: i.variantCode,
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       lineTotal: (i.unitPrice || 0) * i.quantity,

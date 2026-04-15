@@ -36,6 +36,11 @@ export async function GET(request: Request) {
             take: 1,
             select: { imagePath: true, thumbnailPath: true, altText: true },
           },
+          _count: {
+            select: {
+              variants: { where: { isActive: true } },
+            },
+          },
         },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
         skip,
@@ -53,6 +58,7 @@ export async function GET(request: Request) {
 
       return {
         ...product,
+        variantCount: product._count.variants,
         price: productCatalogMode ? null : product.price,
         wholesalePrice: productCatalogMode ? null : product.wholesalePrice,
       };

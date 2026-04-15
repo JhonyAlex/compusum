@@ -49,9 +49,12 @@ export async function POST(request: NextRequest) {
 
       // Crear nuevos items
       await db.cartItem.createMany({
-        data: items.map((item: { productId: string; quantity: number; unitPrice?: number }) => ({
+        data: items.map((item: { productId: string; variantId?: string | null; variantName?: string | null; variantCode?: string | null; quantity: number; unitPrice?: number }) => ({
           cartId: cart.id,
           productId: item.productId,
+          variantId: item.variantId || null,
+          variantName: item.variantName || null,
+          variantCode: item.variantCode || null,
           quantity: item.quantity,
           unitPrice: item.unitPrice || null,
         })),
@@ -59,15 +62,22 @@ export async function POST(request: NextRequest) {
     } else if (action === "add") {
       // Agregar items (sin eliminar anteriores)
       const itemsToAdd = items.filter((newItem: any) => {
-        const exists = cart.items?.some((existing) => existing.productId === newItem.productId);
+        const exists = cart.items?.some(
+          (existing) =>
+            existing.productId === newItem.productId &&
+            (existing.variantId ?? null) === (newItem.variantId ?? null)
+        );
         return !exists;
       });
 
       if (itemsToAdd.length > 0) {
         await db.cartItem.createMany({
-          data: itemsToAdd.map((item: { productId: string; quantity: number; unitPrice?: number }) => ({
+          data: itemsToAdd.map((item: { productId: string; variantId?: string | null; variantName?: string | null; variantCode?: string | null; quantity: number; unitPrice?: number }) => ({
             cartId: cart.id,
             productId: item.productId,
+            variantId: item.variantId || null,
+            variantName: item.variantName || null,
+            variantCode: item.variantCode || null,
             quantity: item.quantity,
             unitPrice: item.unitPrice || null,
           })),
@@ -76,24 +86,39 @@ export async function POST(request: NextRequest) {
 
       // Actualizar cantidades de items existentes
       for (const item of items) {
-        const existing = cart.items?.find((ci) => ci.productId === item.productId);
+        const existing = cart.items?.find(
+          (ci) =>
+            ci.productId === item.productId &&
+            (ci.variantId ?? null) === (item.variantId ?? null)
+        );
         if (existing && existing.quantity !== item.quantity) {
           await db.cartItem.update({
             where: { id: existing.id },
-            data: { quantity: item.quantity },
+            data: {
+              quantity: item.quantity,
+              unitPrice: item.unitPrice || null,
+              variantName: item.variantName || null,
+              variantCode: item.variantCode || null,
+            },
           });
         }
       }
     } else if (action === "update") {
       // Actualizar items específicos sin eliminar
       for (const item of items) {
-        const existing = cart.items?.find((ci) => ci.productId === item.productId);
+        const existing = cart.items?.find(
+          (ci) =>
+            ci.productId === item.productId &&
+            (ci.variantId ?? null) === (item.variantId ?? null)
+        );
         if (existing) {
           await db.cartItem.update({
             where: { id: existing.id },
             data: {
               quantity: item.quantity,
               unitPrice: item.unitPrice || null,
+              variantName: item.variantName || null,
+              variantCode: item.variantCode || null,
             },
           });
         }

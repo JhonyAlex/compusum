@@ -1,0 +1,35 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "noop",
+			"type": "shell",
+			"command": "echo noop"
+		},
+		{
+			"label": "cleanup-noop",
+			"type": "shell",
+			"command": "echo cleanup"
+		},
+		{
+			"label": "noop2",
+			"type": "shell",
+			"command": "echo ok"
+		},
+		{
+			"label": "noop3",
+			"type": "shell",
+			"command": "echo proceeding"
+		},
+		{
+			"label": "create-migration-dir",
+			"type": "shell",
+			"command": "New-Item -ItemType Directory -Force prisma/migrations/20260415123000_fix_cartitem_variant_unique_indexes | Out-Null"
+		},
+		{
+			"label": "noop4",
+			"type": "shell",
+			"command": "echo writing"
+		}
+	]
+}

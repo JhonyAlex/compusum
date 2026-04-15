@@ -26,7 +26,9 @@ export function AddToCartButton({ product, variant = "icon", className }: AddToC
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setAdded(false), 1200);
     toast.success("Producto agregado al carrito", {
-      description: product.name,
+      description: product.variantName
+        ? `${product.name} - ${product.variantName}`
+        : product.name,
       action: {
         label: "Ver carrito",
         onClick: () => setOpen(true),
