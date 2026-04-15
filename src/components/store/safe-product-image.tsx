@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image, { type ImageProps } from "next/image";
+import { isBlockedImageSource } from "@/lib/product-fallbacks";
 
 type SafeProductImageProps = Omit<ImageProps, "src"> & {
   src?: string | null;
   fallbackText?: string;
+  preventNotFoundLog?: boolean;
 };
 
 export function SafeProductImage({
@@ -13,22 +15,63 @@ export function SafeProductImage({
   alt,
   fill,
   className,
-  fallbackText = "Próximamente",
+  fallbackText = "próximamente",
+  preventNotFoundLog = false,
   onError,
   ...props
 }: SafeProductImageProps) {
   const normalizedSrc = useMemo(() => {
     if (typeof src !== "string") return "";
-    return src.trim();
+    const trimmedSrc = src.trim();
+
+    if (!trimmedSrc || isBlockedImageSource(trimmedSrc)) {
+      return "";
+    }
+
+    return trimmedSrc;
   }, [src]);
 
   const [hasError, setHasError] = useState(false);
+  const [isCheckingSrc, setIsCheckingSrc] = useState(false);
+  const [isSrcAvailable, setIsSrcAvailable] = useState(true);
 
   useEffect(() => {
     setHasError(false);
+    setIsCheckingSrc(false);
+    setIsSrcAvailable(true);
   }, [normalizedSrc]);
 
-  const showFallback = normalizedSrc.length === 0 || hasError;
+  useEffect(() => {
+    if (!preventNotFoundLog || normalizedSrc.length === 0 || !normalizedSrc.startsWith("/uploads/")) {
+      return;
+    }
+
+    let active = true;
+    setIsCheckingSrc(true);
+
+    fetch(normalizedSrc, { method: "HEAD", cache: "no-store" })
+      .then((response) => {
+        if (!active) return;
+        setIsSrcAvailable(response.ok);
+      })
+      .catch(() => {
+        if (!active) return;
+        setIsSrcAvailable(false);
+      })
+      .finally(() => {
+        if (!active) return;
+        setIsCheckingSrc(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [preventNotFoundLog, normalizedSrc]);
+
+  const showFallback =
+    normalizedSrc.length === 0
+    || hasError
+    || (preventNotFoundLog && (isCheckingSrc || !isSrcAvailable));
 
   if (showFallback) {
     return (

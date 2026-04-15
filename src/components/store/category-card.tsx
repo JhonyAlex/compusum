@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface Category {
@@ -24,8 +24,8 @@ export function CategoryCard({ category }: CategoryCardProps) {
     <Link href={`/catalogo?categoria=${category.slug}`}>
       <Card className="group overflow-hidden border border-gray-100 hover:border-primary/30 hover:shadow-lg transition-all duration-300 bg-white text-center">
         <div className="relative aspect-square overflow-hidden">
-          <Image
-            src={category.image || `https://picsum.photos/seed/${category.slug}/300/300`}
+          <SafeProductImage
+            src={category.image}
             alt={category.name}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-500"

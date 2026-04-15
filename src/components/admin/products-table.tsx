@@ -40,6 +40,7 @@ import {
 import { toast } from "sonner";
 import { useDebouncedSearch } from "@/hooks/use-debounced-search";
 import { normalizeProductImagePath } from "@/lib/product-fallbacks";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 
 interface Filters {
   search: string;
@@ -535,16 +536,16 @@ export function AdminProductsTable() {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              {product.images?.[0]?.imagePath ? (
-                                <img
-                                  src={normalizeProductImagePath(product.images[0].imagePath)}
-                                  alt={product.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <Package className="h-5 w-5 text-slate-400" />
-                              )}
+                            <div className="relative w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                              <SafeProductImage
+                                src={normalizeProductImagePath(product.images?.[0]?.imagePath)}
+                                alt={product.name}
+                                fill
+                                className="object-cover"
+                                sizes="40px"
+                                fallbackText="próximamente"
+                                preventNotFoundLog
+                              />
                             </div>
                             <div>
                               <p className="font-medium text-slate-900 text-sm">

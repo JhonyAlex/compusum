@@ -4,8 +4,8 @@ import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import Link from "next/link";
-import Image from "next/image";
 import { Calendar, Package } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -74,8 +74,8 @@ export default async function TemporadasPage() {
                       className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300"
                     >
                       <div className="relative h-48 bg-gray-100">
-                        <Image
-                          src={`https://picsum.photos/seed/${season.slug}/400/300`}
+                        <SafeProductImage
+                          src=""
                           alt={season.name}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-500"

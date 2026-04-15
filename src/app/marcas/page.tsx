@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { Header } from "@/components/store/header";
 import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -180,8 +181,8 @@ export default async function MarcasPage() {
                       </div>
 
                       {/* Logo Image */}
-                      <img
-                        src={brand.logo || `https://picsum.photos/seed/${brand.slug}/200/200`}
+                      <SafeProductImage
+                        src={brand.logo}
                         alt={brand.name}
                         className="relative w-full h-full object-contain 
                                    transition-all duration-500 ease-out

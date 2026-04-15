@@ -1,9 +1,9 @@
 import { Header } from "@/components/store/header";
 import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image";
 import { Award, Users, Package, MapPin, Phone, Mail, Clock, Target, Eye, Heart } from "lucide-react";
 
 export default function NosotrosPage() {
@@ -43,8 +43,8 @@ export default function NosotrosPage() {
                 </Button>
               </div>
               <div className="relative hidden md:block">
-                <Image
-                  src="https://picsum.photos/seed/compusum-team/600/400"
+                <SafeProductImage
+                  src=""
                   alt="Equipo Compusum"
                   width={600}
                   height={400}
@@ -168,8 +168,8 @@ export default function NosotrosPage() {
                 </div>
               </div>
               <div className="relative h-64 md:h-80 rounded-xl overflow-hidden">
-                <Image
-                  src="https://picsum.photos/seed/compusum-store/600/400"
+                <SafeProductImage
+                  src=""
                   alt="Tienda Compusum"
                   fill
                   className="object-cover"

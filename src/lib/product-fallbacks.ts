@@ -2,9 +2,29 @@ const DEFAULT_PRODUCT_NAME = "Producto sin nombre";
 const DEFAULT_PRODUCT_SLUG = "producto";
 const DEFAULT_BRAND_NAME = "Marca no especificada";
 const DEFAULT_BRAND_SLUG = "marca";
+const BLOCKED_IMAGE_HOSTS = ["unsplash.com", "images.unsplash.com", "source.unsplash.com"];
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+export function isBlockedImageSource(value: unknown): boolean {
+  if (!isNonEmptyString(value)) {
+    return false;
+  }
+
+  const candidate = value.trim().toLowerCase();
+
+  if (candidate.startsWith("http://") || candidate.startsWith("https://")) {
+    try {
+      const parsedUrl = new URL(candidate);
+      return BLOCKED_IMAGE_HOSTS.some((host) => parsedUrl.hostname === host || parsedUrl.hostname.endsWith(`.${host}`));
+    } catch {
+      return candidate.includes("unsplash.com");
+    }
+  }
+
+  return candidate.includes("unsplash.com");
 }
 
 export function resolveProductName(name: unknown): string {
@@ -24,16 +44,20 @@ export function resolveBrandSlug(slug: unknown): string {
 }
 
 export function resolveProductImageSrc(slug: unknown, size: string): string {
-  const safeSlug = resolveProductSlug(slug);
-  return `https://picsum.photos/seed/${safeSlug}/${size}`;
+  void slug;
+  void size;
+  return "";
 }
 
 export function resolveBrandLogoSrc(logo: unknown, brandSlug: unknown, size: string): string {
-  if (isNonEmptyString(logo)) {
+  void brandSlug;
+  void size;
+
+  if (isNonEmptyString(logo) && !isBlockedImageSource(logo)) {
     return logo.trim();
   }
-  const safeBrandSlug = resolveBrandSlug(brandSlug);
-  return `https://picsum.photos/seed/${safeBrandSlug}/${size}`;
+
+  return "";
 }
 
 export function normalizeProductImagePath(imagePath: unknown): string {
@@ -42,6 +66,21 @@ export function normalizeProductImagePath(imagePath: unknown): string {
   }
 
   const value = imagePath.trim();
+  if (isBlockedImageSource(value)) {
+    return "";
+  }
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    try {
+      const parsedUrl = new URL(value);
+      if (parsedUrl.pathname.startsWith("/uploads/")) {
+        return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+      }
+    } catch {
+      // Keep the original value when URL parsing fails.
+    }
+  }
+
   if (
     value.startsWith("http://")
     || value.startsWith("https://")

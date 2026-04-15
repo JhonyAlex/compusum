@@ -3,6 +3,7 @@ import { Header } from "@/components/store/header";
 import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
 import { HeroSearchBar } from "@/components/store/hero-search-bar";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -589,8 +590,8 @@ export default async function HomePage() {
                       </div>
 
                       {/* Logo Image */}
-                      <img
-                        src={brand.logo || `https://picsum.photos/seed/${brand.slug}/100/100`}
+                      <SafeProductImage
+                        src={brand.logo}
                         alt={brand.name}
                         className="relative w-full h-full object-contain 
                                    transition-all duration-500 ease-out

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import Image from "next/image";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import {
   User,
   Mail,
@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CartAdminActions } from "@/components/admin/cart-admin-actions";
 import { formatPrice } from "@/lib/format";
+import { resolveProductImageSrc } from "@/lib/product-fallbacks";
 
 export const dynamic = "force-dynamic";
 
@@ -194,8 +195,8 @@ export default async function AdminCartDetailPage({ params }: Props) {
                 return (
                   <div key={item.id} className="flex items-center gap-3 px-4 py-3">
                     <div className="relative w-12 h-12 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden">
-                      <Image
-                        src={`https://picsum.photos/seed/${item.product.slug}/60/60`}
+                      <SafeProductImage
+                        src={resolveProductImageSrc(item.product.slug, "60/60")}
                         alt={item.product.name}
                         fill
                         className="object-cover"

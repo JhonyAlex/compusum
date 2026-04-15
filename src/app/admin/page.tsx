@@ -5,6 +5,8 @@ import { Header } from "@/components/admin/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SafeProductImage } from "@/components/store/safe-product-image";
+import { normalizeProductImagePath } from "@/lib/product-fallbacks";
 import Link from "next/link";
 import {
   Package,
@@ -192,16 +194,16 @@ export default async function AdminDashboard() {
                   className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
                 >
                   {/* Image */}
-                  <div className="w-12 h-12 bg-slate-200 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {product.images[0]?.imagePath ? (
-                      <img
-                        src={product.images[0].imagePath}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Package className="h-6 w-6 text-slate-400" />
-                    )}
+                  <div className="relative w-12 h-12 bg-slate-200 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <SafeProductImage
+                      src={normalizeProductImagePath(product.images[0]?.imagePath)}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                      sizes="48px"
+                      fallbackText="próximamente"
+                      preventNotFoundLog
+                    />
                   </div>
 
                   {/* Info */}

@@ -1,9 +1,9 @@
 import { Header } from "@/components/store/header";
 import { Footer } from "@/components/store/footer";
 import { WhatsAppButton } from "@/components/store/whatsapp-button";
+import { SafeProductImage } from "@/components/store/safe-product-image";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image";
 import { 
   CheckCircle, 
   Truck, 
@@ -67,8 +67,8 @@ export default function MayoristasPage() {
                 </div>
               </div>
               <div className="relative hidden md:block">
-                <Image
-                  src="https://picsum.photos/seed/wholesale-boxes/600/400"
+                <SafeProductImage
+                  src=""
                   alt="Ventas por mayor"
                   width={600}
                   height={400}
