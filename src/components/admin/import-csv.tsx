@@ -574,7 +574,7 @@ export function ImportadorCSV() {
                       className="rounded border-slate-300"
                     />
                     <span className="text-sm text-slate-700">
-                      Omitir variación "Genérico" en productos con una sola fila
+                      Omitir variación "Genérico" o "No subir" en productos con una sola fila
                     </span>
                   </label>
                 </div>

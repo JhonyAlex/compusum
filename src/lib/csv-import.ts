@@ -97,7 +97,7 @@ function normalizeVariantName(value: string): string {
 
 function isGenericVariant(name: string): boolean {
   const n = normalizeVariantName(name);
-  return n === 'gn' || n === 'generico';
+  return n === 'gn' || n === 'generico' || n === 'no subir';
 }
 
 // ─── Group CSV rows into products ─────────────────────────────────────────────
