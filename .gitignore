@@ -48,5 +48,6 @@ test
 prompt
 
 server.log
+trabajo-local/
 # Skills directory
 /skills/
