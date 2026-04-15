@@ -46,6 +46,11 @@ interface ImportBatchResult {
   processed: number;
 }
 
+function hasValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  return String(value).trim() !== "";
+}
+
 // ─── constants ────────────────────────────────────────────────────────────────
 
 /**
@@ -113,8 +118,8 @@ export function ImportadorCSV() {
     }
 
     const productsWithoutPrice = groupResult.products.filter((p) => {
-      const hasProductPrice = (p.price ?? "").trim() !== "";
-      const hasVariantPrice = p.variants.some((v) => (v.price ?? "").trim() !== "");
+      const hasProductPrice = hasValue(p.price);
+      const hasVariantPrice = p.variants.some((v) => hasValue(v.price));
       return !hasProductPrice && !hasVariantPrice;
     }).length;
     if (productsWithoutPrice > 0) {

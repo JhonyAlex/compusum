@@ -5,7 +5,7 @@ export function GET() {
   return new NextResponse(null, {
     status: 307,
     headers: {
-      Location: "/logo.svg",
+      Location: "/icono.svg",
     },
   });
 }
