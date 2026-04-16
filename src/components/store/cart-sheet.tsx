@@ -16,6 +16,7 @@ import { useCartStore, getItemCount, getSubtotal } from "@/stores/cart-store";
 import { CartItemRow } from "@/components/store/cart-item-row";
 import { CrossSellSection } from "@/components/store/cross-sell-section";
 import { CartFeaturedProducts } from "@/components/store/cart-featured-products";
+import { CartEmptyTopCategories } from "@/components/store/cart-empty-top-categories";
 import { ShareCartMenu } from "@/components/store/share-cart-menu";
 import { formatPrice } from "@/lib/format";
 import Link from "next/link";
@@ -88,6 +89,8 @@ export function CartSheet() {
                   Ver catálogo
                 </Link>
               </Button>
+
+              <CartEmptyTopCategories onNavigate={() => setOpen(false)} />
             </div>
             {/* Featured products in empty cart */}
             <div className="px-4 pb-6">

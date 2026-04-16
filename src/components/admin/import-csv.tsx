@@ -145,9 +145,17 @@ export function ImportadorCSV() {
   }, [groupResult, preflightReport, preflightRun, preflightAccepted]);
 
   useEffect(() => {
+    // If source data or mapping changes, preflight must run again from scratch.
     setPreflightRun(false);
     setPreflightAccepted(false);
-  }, [mapping, skipGeneric, skipNoSubir, rows]);
+  }, [mapping, rows]);
+
+  useEffect(() => {
+    // Option tweaks can change outcomes; keep report visible but require a fresh confirmation.
+    if (preflightRun) {
+      setPreflightAccepted(false);
+    }
+  }, [duplicateMode, skipGeneric, skipNoSubir, preflightRun]);
 
   // ── file handling ─────────────────────────────────────────────────────────
   const handleFile = useCallback(async (f: File) => {
@@ -607,6 +615,12 @@ export function ImportadorCSV() {
                       Ejecutar validación
                     </Button>
                   </div>
+
+                  {!preflightRun && (
+                    <p className="text-xs text-slate-500">
+                      Ejecuta la validación para habilitar la importación.
+                    </p>
+                  )}
 
                   {preflightRun && preflightReport && (
                     <div className="space-y-2 text-sm">

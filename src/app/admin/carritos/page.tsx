@@ -5,11 +5,10 @@ import { Header } from "@/components/admin/header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CartListDeleteButton } from "@/components/admin/cart-list-delete-button";
 import Link from "next/link";
 import {
   ShoppingCart,
-  Eye,
-  ExternalLink,
   User,
   Building2,
   Calendar,
@@ -102,9 +101,17 @@ export default async function AdminCarritosPage({ searchParams }: Props) {
             {carts.map((cart) => {
               const status = statusConfig[cart.status] || statusConfig.activo;
               return (
-                <Card key={cart.id} className={!cart.isActive ? "opacity-50" : ""}>
+                <Card
+                  key={cart.id}
+                  className={`relative transition-colors hover:border-slate-300 ${!cart.isActive ? "opacity-50" : ""}`}
+                >
+                  <Link
+                    href={`/admin/carritos/${cart.id}`}
+                    className="absolute inset-0 z-0"
+                    aria-label={`Abrir carrito ${cart.customerName || cart.uuid}`}
+                  />
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="relative z-10 flex items-center justify-between pointer-events-none">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           {cart.customerName ? (
@@ -150,21 +157,11 @@ export default async function AdminCarritosPage({ searchParams }: Props) {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 ml-4">
-                        <Button asChild variant="ghost" size="sm">
-                          <Link href={`/admin/carritos/${cart.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button asChild variant="ghost" size="sm">
-                          <a
-                            href={`/carrito/${cart.uuid}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </Button>
+                      <div className="ml-4 pointer-events-auto">
+                        <CartListDeleteButton
+                          cartId={cart.id}
+                          hasOrders={cart._count.orders > 0}
+                        />
                       </div>
                     </div>
                   </CardContent>
