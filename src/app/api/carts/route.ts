@@ -47,9 +47,17 @@ export async function POST(request: NextRequest) {
         where: { cartId: cart.id },
       });
 
+      // Deduplicar por (productId, variantId) para evitar violaciones de índice único
+      const itemMap = new Map<string, typeof items[number]>();
+      for (const item of items) {
+        const key = `${item.productId}::${item.variantId ?? "base"}`;
+        itemMap.set(key, item);
+      }
+      const deduplicatedItems = Array.from(itemMap.values());
+
       // Crear nuevos items
       await db.cartItem.createMany({
-        data: items.map((item: { productId: string; variantId?: string | null; variantName?: string | null; variantCode?: string | null; quantity: number; unitPrice?: number }) => ({
+        data: deduplicatedItems.map((item: { productId: string; variantId?: string | null; variantName?: string | null; variantCode?: string | null; quantity: number; unitPrice?: number }) => ({
           cartId: cart.id,
           productId: item.productId,
           variantId: item.variantId || null,

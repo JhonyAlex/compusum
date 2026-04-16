@@ -44,14 +44,25 @@ export async function upsertActiveCart(
     }
 
     // Crear carrito para esta sesión
-    return await db.cart.create({
-      data: {
-        sessionId,
-        status: 'activo',
-        cityId: cityId || null,
-      },
-      include: { items: true },
-    });
+    try {
+      return await db.cart.create({
+        data: {
+          sessionId,
+          status: 'activo',
+          cityId: cityId || null,
+        },
+        include: { items: true },
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        // Race condition: another concurrent request already created this cart
+        return await db.cart.findFirstOrThrow({
+          where: { sessionId, status: 'activo' },
+          include: { items: true },
+        });
+      }
+      throw e;
+    }
   }
 
   if (userId) {
@@ -68,14 +79,25 @@ export async function upsertActiveCart(
     }
 
     // Crear carrito para este usuario
-    return await db.cart.create({
-      data: {
-        userId,
-        status: 'activo',
-        cityId: cityId || null,
-      },
-      include: { items: true },
-    });
+    try {
+      return await db.cart.create({
+        data: {
+          userId,
+          status: 'activo',
+          cityId: cityId || null,
+        },
+        include: { items: true },
+      });
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        // Race condition: another concurrent request already created this cart
+        return await db.cart.findFirstOrThrow({
+          where: { userId, status: 'activo' },
+          include: { items: true },
+        });
+      }
+      throw e;
+    }
   }
 
   // Fallback
