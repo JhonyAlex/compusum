@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Phone, Mail, Clock, MessageCircle, Send, CheckCircle } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, MessageCircle, Send, CheckCircle, Loader2 } from "lucide-react";
 
 export default function ContactoPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -137,7 +137,10 @@ export default function ContactoPage() {
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? (
-                        "Enviando..."
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Enviando...
+                        </>
                       ) : (
                         <>
                           <Send className="h-4 w-4 mr-2" />
