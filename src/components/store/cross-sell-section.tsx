@@ -43,17 +43,22 @@ export function CrossSellSection() {
       .catch(() => {});
   }, []);
 
+  // Performance: Extract primitive derived values for dependency array
+  // to avoid redundant API requests when unrelated item properties (like quantity) change.
+  const hasItems = items.length > 0;
+  const categorySlug = items[0]?.product.category?.slug;
+  const cartProductIdsStr = items.map((i) => i.product.id).sort().join(',');
+
   useEffect(() => {
-    if (!enabled || items.length === 0) {
+    if (!enabled || !hasItems || !categorySlug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSuggestions([]);
       return;
     }
 
-    const categorySlug = items[0]?.product.category?.slug;
-    if (!categorySlug) return;
+    const cartProductIds = new Set(cartProductIdsStr.split(','));
 
-    const cartProductIds = new Set(items.map((i) => i.product.id));
-
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetch(`/api/products?category=${categorySlug}&limit=6`)
       .then((r) => r.json())
@@ -68,7 +73,7 @@ export function CrossSellSection() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [items, enabled]);
+  }, [hasItems, categorySlug, cartProductIdsStr, enabled]);
 
   if (suggestions.length === 0 || loading) return null;
 
