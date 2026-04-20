@@ -9,6 +9,17 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -34,6 +45,7 @@ export function CartSheet() {
 
   // Prevent hydration mismatch for Zustand persist
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
@@ -54,15 +66,32 @@ export function CartSheet() {
               )}
             </SheetTitle>
             {items.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-slate-400 hover:text-red-500"
-                onClick={clearCart}
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1" />
-                Vaciar
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-slate-400 hover:text-red-500"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Vaciar
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Vaciar carrito?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta acción eliminará todos los productos de tu carrito. ¿Estás seguro de que deseas continuar?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={clearCart} className="bg-red-600 hover:bg-red-700 text-white">
+                      Vaciar carrito
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
         </SheetHeader>
