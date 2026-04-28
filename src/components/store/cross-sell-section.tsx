@@ -43,16 +43,20 @@ export function CrossSellSection() {
       .catch(() => {});
   }, []);
 
+  // ⚡ Bolt: Extract primitive values to prevent redundant API calls when only quantities change
+  const itemCount = items.length;
+  const categorySlug = items[0]?.product.category?.slug;
+  const productIds = items.map(i => i.product.id).join(',');
+
   useEffect(() => {
-    if (!enabled || items.length === 0) {
+    if (!enabled || itemCount === 0) {
       setSuggestions([]);
       return;
     }
 
-    const categorySlug = items[0]?.product.category?.slug;
     if (!categorySlug) return;
 
-    const cartProductIds = new Set(items.map((i) => i.product.id));
+    const cartProductIds = new Set(productIds.split(',').filter(Boolean));
 
     setLoading(true);
     fetch(`/api/products?category=${categorySlug}&limit=6`)
@@ -68,7 +72,7 @@ export function CrossSellSection() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [items, enabled]);
+  }, [enabled, itemCount, categorySlug, productIds]);
 
   if (suggestions.length === 0 || loading) return null;
 
