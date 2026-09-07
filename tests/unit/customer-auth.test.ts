@@ -380,18 +380,54 @@ describe('Auth: cambio de contraseña', () => {
   });
 });
 
-describe('Auth: restablecimiento por OTP', () => {
-  it('OTP inválido o expirado => rechazado y sin cambiar contraseña', async () => {
+describe('Auth: restablecimiento por OTP (anti-enumeración)', () => {
+  it('OTP inválido o expirado => error GENÉRICO y sin cambiar contraseña', async () => {
     mockDb.user.findFirst.mockResolvedValue({
       id: 'u1',
-      phone: '3001234567',
+      phone: '573001234567',
       isActive: true,
     });
 
     await expect(
       resetPasswordWithOtp('3001234567', '9999', TEST_NEW_PASSWORD)
-    ).rejects.toThrow('Código inválido o expirado');
+    ).rejects.toThrow(CustomerAuthError);
 
+    expect(mockDb.user.update).not.toHaveBeenCalled();
+    expect(mockDb.session.deleteMany).not.toHaveBeenCalled();
+    // El OTP sí se verificó contra el teléfono CANÓNICO de la cuenta
+    const { verifyPhoneOtp } = await import('@/lib/auth-dual');
+    expect(verifyPhoneOtp).toHaveBeenCalledWith('573001234567', '9999');
+  });
+
+  it('cuenta inexistente => error genérico y NUNCA verifica el email como teléfono', async () => {
+    mockDb.user.findFirst.mockResolvedValue(null);
+
+    await expect(
+      resetPasswordWithOtp('nadie@test.com', '1234', TEST_NEW_PASSWORD)
+    ).rejects.toThrow(CustomerAuthError);
+
+    // El identificador crudo (email) NO llegó al proveedor: hacerlo produciría
+    // un error de formato que filtra la existencia de la cuenta.
+    const { verifyPhoneOtp } = await import('@/lib/auth-dual');
+    expect(verifyPhoneOtp).not.toHaveBeenCalled();
+    expect(mockDb.user.create).not.toHaveBeenCalled();
+    expect(mockDb.user.update).not.toHaveBeenCalled();
+  });
+
+  it('fallo del proveedor (Twilio caído) => mismo error genérico, sin propagar el mensaje', async () => {
+    mockDb.user.findFirst.mockResolvedValue({
+      id: 'u1',
+      phone: '573001234567',
+      isActive: true,
+    });
+    const { verifyPhoneOtp } = await import('@/lib/auth-dual');
+    (verifyPhoneOtp as any).mockRejectedValueOnce(
+      new Error('Twilio: unable to create record (bobcat)')
+    );
+
+    await expect(
+      resetPasswordWithOtp('3001234567', '1234', TEST_NEW_PASSWORD)
+    ).rejects.toThrow(/No fue posible restablecer/);
     expect(mockDb.user.update).not.toHaveBeenCalled();
   });
 

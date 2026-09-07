@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resetPasswordWithOtp, CustomerAuthError } from '@/lib/customer-auth';
+import {
+  resetPasswordWithOtp,
+  CustomerAuthError,
+  GENERIC_RESET_FAILURE,
+} from '@/lib/customer-auth';
 import { checkRateLimit, recordFailedAttempt, resetRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const RESET_MAX_ATTEMPTS = 5;
@@ -9,6 +13,13 @@ const RESET_LOCKOUT_MS = 30 * 60 * 1000;
 /**
  * Completa el restablecimiento de contraseña verificando el OTP enviado al
  * teléfono. Al terminar se CIERRAN todas las sesiones del usuario.
+ *
+ * ANTI-ENUMERACIÓN: todos los fallos de verificación (cuenta inexistente,
+ * inactiva, OTP inválido/expirado, proveedor no disponible) devuelven EXACTAMENTE
+ * la misma respuesta (status 400 + GENERIC_RESET_FAILURE). La contraseña débil
+ * es un error de FORMA del request: ocurre antes de tocar la base de datos, así
+ * que su mensaje específico no revela nada sobre la existencia de cuentas.
+ * Los mensajes de Twilio o de canonicalización NUNCA llegan al cliente.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -44,17 +55,21 @@ export async function POST(req: NextRequest) {
         message: 'Contraseña restablecida. Ya puedes iniciar sesión.',
       });
     } catch (error) {
-      if (error instanceof CustomerAuthError) {
-        await recordFailedAttempt(ipKey, RESET_MAX_ATTEMPTS, RESET_WINDOW_MS, RESET_LOCKOUT_MS);
+      if (error instanceof CustomerAuthError && error.code === 'WEAK_PASSWORD') {
         return NextResponse.json(
           { success: false, error: error.message, code: error.code },
-          { status: error.code === 'INVALID_CONTACT' ? 400 : 400 }
+          { status: 400 }
         );
       }
-      // Errores de OTP del proveedor (código inválido/expirado)
-      const message = error instanceof Error ? error.message : 'Código inválido o expirado';
+
+      // Todo lo demás es INDISTINGUIBLE entre sí: mismo status y mismo mensaje.
+      // El detalle real (proveedor, cuenta inexistente, OTP) solo en log server-side.
+      console.warn(
+        '[RESET_PASSWORD] Restablecimiento rechazado (respuesta genérica):',
+        error instanceof Error ? `${error.name}: ${error.message}` : error
+      );
       await recordFailedAttempt(ipKey, RESET_MAX_ATTEMPTS, RESET_WINDOW_MS, RESET_LOCKOUT_MS);
-      return NextResponse.json({ success: false, error: message }, { status: 400 });
+      return NextResponse.json({ success: false, error: GENERIC_RESET_FAILURE }, { status: 400 });
     }
   } catch (error) {
     console.error('Reset password error:', error);

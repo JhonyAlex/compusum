@@ -4,9 +4,10 @@
 -- ============================================================================
 -- 1) Backfill de teléfono al formato canónico: '57' + número local de 10
 --    dígitos (ver src/lib/phone.ts).
---    - Solo toca filas locales de 10 dígitos VÁLIDAS (móvil ^3..., fijo
---      ^60...), consistente con canonicalColombiaPhone(). Las cuentas creadas
---      por OTP ya tenían '57...' (12 dígitos) y no se tocan.
+--    - Solo toca filas locales de 10 dígitos VÁLIDAS: móvil ^3[0-9]{9}
+--      (10 dígitos) y fijo ^60[0-9]{8} (10 dígitos), exactamente las formas
+--      que canonicalColombiaPhone() acepta. Las cuentas creadas por OTP ya
+--      tenían '57...' (12 dígitos) y no se tocan.
 --    - OMITE (nunca fusiona) filas cuya forma canónica YA exista en otra
 --      cuenta: la colisión se reporta en el log del deploy con RAISE WARNING
 --      y ambas cuentas siguen operando gracias a la búsqueda por variantes
@@ -21,7 +22,7 @@ DECLARE
 BEGIN
   UPDATE "User"
   SET "phone" = '57' || "phone"
-  WHERE "phone" ~ '^(3|60)[0-9]{8}$'
+  WHERE "phone" ~ '^(3[0-9]{9}|60[0-9]{8})$'
     AND NOT EXISTS (
       SELECT 1 FROM "User" other
       WHERE other."phone" = '57' || "User"."phone"
@@ -29,7 +30,7 @@ BEGIN
 
   SELECT count(*) INTO skipped_collisions
   FROM "User"
-  WHERE "phone" ~ '^(3|60)[0-9]{8}$';
+  WHERE "phone" ~ '^(3[0-9]{9}|60[0-9]{8})$';
 
   IF skipped_collisions > 0 THEN
     RAISE WARNING '[phone-canonicalization] % cuenta(s) con telefono local de 10 digitos NO migrada(s) por colision con su formato canonico (57XXXXXXXXXX). No se fusionaron usuarios: resolver manualmente. La app resuelve ambas formas via phoneStorageVariants().', skipped_collisions;

@@ -20,6 +20,16 @@ import { toAuthUserDTO, AuthUserDTO } from './user-dto';
 export const MIN_PASSWORD_LENGTH = 8;
 export const PASSWORD_RESET_SESSION_HOURS = 24;
 
+/**
+ * ÚNICO mensaje externo para todos los fallos de restablecimiento que podrían
+ * revelar existencia de cuenta: cuenta inexistente, inactiva, sin teléfono,
+ * OTP inválido/expirado o proveedor caído. Mismo status y mismo body en todos
+ * esos casos; los detalles (Twilio, canonicalización, etc.) solo van al log
+ * server-side.
+ */
+export const GENERIC_RESET_FAILURE =
+  'No fue posible restablecer la contraseña. Verifica tus datos o solicita un nuevo código.';
+
 export class CustomerAuthError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -229,6 +239,12 @@ export async function requestPasswordReset(
  * Restablece la contraseña verificando el OTP del teléfono. Al terminar,
  * CIERRA todas las sesiones activas del usuario (el atacante con sesión
  * abierta pierde el acceso y el usuario real vuelve a entrar).
+ *
+ * ANTI-ENUMERACIÓN: cuenta inexistente, inactiva, sin teléfono y OTP
+ * inválido/expirado producen EXACTAMENTE el mismo error genérico
+ * (GENERIC_RESET_FAILURE). NUNCA se verifica un email/identificador
+ * desconocido contra el proveedor: el error técnico de formato filtraría la
+ * existencia de la cuenta. Los mensajes del proveedor no se propagan.
  */
 export async function resetPasswordWithOtp(
   phoneOrEmail: string,
@@ -237,20 +253,26 @@ export async function resetPasswordWithOtp(
 ): Promise<void> {
   validatePasswordStrength(newPassword);
 
-  const email = normalizeCustomerEmail(phoneOrEmail);
-  const phoneVariants = phoneOrVariants(phoneOrEmail);
-  const lookupContact = phoneVariants[0] ?? email ?? '';
-
   const user = await findCustomerByContact(phoneOrEmail);
 
-  // Verificar OTP aunque la cuenta no exista: mismo tiempo de respuesta y
-  // validación del proveedor (sin revelar existencia).
   if (!user || !user.isActive || !user.phone) {
-    await verifyPhoneOtp(lookupContact, otpCode);
-    throw new CustomerAuthError('INVALID_CONTACT', 'No fue posible restablecer la contraseña.');
+    // Falla genérica SIN llamar al proveedor: no hay teléfono real contra el
+    // cual verificar, y verificar el identificador crudo (p.ej. un email)
+    // produciría un error de formato distinguible del de un OTP inválido.
+    throw new CustomerAuthError('RESET_FAILED', GENERIC_RESET_FAILURE);
   }
 
-  await verifyPhoneOtp(user.phone, otpCode);
+  try {
+    await verifyPhoneOtp(user.phone, otpCode);
+  } catch (otpError) {
+    // OTP inválido/expirado, proveedor no configurado o fallo del proveedor:
+    // MISMA respuesta externa que una cuenta inexistente. Detalle solo en log.
+    console.warn(
+      '[RESET_PASSWORD] Verificación OTP fallida (respuesta genérica al cliente):',
+      otpError instanceof Error ? otpError.message : otpError
+    );
+    throw new CustomerAuthError('RESET_FAILED', GENERIC_RESET_FAILURE);
+  }
 
   await db.user.update({
     where: { id: user.id },

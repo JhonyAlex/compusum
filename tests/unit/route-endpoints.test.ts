@@ -76,6 +76,13 @@ import { PUT as cartPUT } from '@/app/api/carts/[uuid]/route';
 import { POST as forgotPOST } from '@/app/api/auth/forgot-password/route';
 import { validateAndPriceItems } from '@/lib/cart-validation';
 import { requestPasswordReset } from '@/lib/customer-auth';
+import {
+  checkRateLimit,
+  FORGOT_ID_MAX_ATTEMPTS,
+  FORGOT_IP_MAX_ATTEMPTS,
+  FORGOT_LOCKOUT_MS,
+  FORGOT_WINDOW_MS,
+} from '@/lib/rate-limit';
 
 const ACTIVE_CART = {
   id: 'cart-1',
@@ -88,11 +95,13 @@ const ACTIVE_CART = {
 };
 
 function cartRequest(uuid: string, body: unknown, ip = '10.0.0.1') {
+  // any: el shim cubre lo que estas rutas usan (headers + json()); NextRequest
+  // completo (cookies/nextUrl) no está disponible en tests unitarios.
   return new NextRequestShim(`http://localhost/api/carts/${uuid}`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json', 'x-session-id': 'guest-session-1', 'x-forwarded-for': ip },
     body: JSON.stringify(body),
-  });
+  }) as any;
 }
 
 /** Request mínimo suficiente para las rutas (evita depender de next/server en tests). */
@@ -151,11 +160,28 @@ describe('ENDPOINT PUT /api/carts/[uuid] — vaciado con items: []', () => {
     expect(mockDb.cart.update).not.toHaveBeenCalled();
   });
 
-  it('sin items en el body => NO toca los items existentes', async () => {
-    await cartPUT(cartRequest('uuid-cart-1', { notes: 'solo notas' }), params);
+  it('sin items en el body (solo notas) => conserva items Y el SUBTOTAL previo', async () => {
+    // Carrito existente con subtotal 15.000 (ACTIVE_CART.subtotal): un PUT de
+    // solo metadata NO puede dejar las líneas con subtotal 0.
+    const res = await cartPUT(cartRequest('uuid-cart-1', { notes: 'solo notas' }), params);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.success).toBe(true);
 
     const updateArg = mockDb.cart.update.mock.calls[0][0];
+    expect(updateArg.data.items).toBeUndefined(); // items intactos
+    expect(updateArg.data.subtotal).toBe(15000); // subtotal PREVIO conservado
+    expect(updateArg.data.notes).toBe('solo notas');
+  });
+
+  it('items: null => trata igual que ausencia: conserva items y subtotal', async () => {
+    const res = await cartPUT(cartRequest('uuid-cart-1', { items: null, notes: 'x' }), params);
+
+    expect(res.status).toBe(200);
+    const updateArg = mockDb.cart.update.mock.calls[0][0];
     expect(updateArg.data.items).toBeUndefined();
+    expect(updateArg.data.subtotal).toBe(15000);
   });
 });
 
@@ -168,7 +194,7 @@ describe('ENDPOINT POST /api/auth/forgot-password — rate limit por identidad',
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
       body: JSON.stringify({ phoneOrEmail }),
-    });
+    }) as any;
   }
 
   it('permite 5 solicitudes con IPs distintas y bloquea la 6ª (misma identidad)', async () => {
@@ -203,5 +229,52 @@ describe('ENDPOINT POST /api/auth/forgot-password — rate limit por identidad',
     }
     const other = await forgotPOST(forgotReq('3112223344', '10.11.0.1'));
     expect(other.status).toBe(200);
+  });
+
+  it('POLÍTICA: bloqueo al umbral EXACTO (5) con check y record COHERENTES', async () => {
+    const POLICY = '3004443322';
+    for (let i = 1; i <= FORGOT_ID_MAX_ATTEMPTS - 1; i++) {
+      const res = await forgotPOST(forgotReq(POLICY, `10.12.0.${i}`));
+      expect(res.status).toBe(200);
+    }
+    // El intento que alcanza el umbral AÚN pasa (check: 4 < 5), pero persiste
+    // blockedUntil (record: attempts >= 5). La respuesta 429 solo en la siguiente.
+    const atThreshold = await forgotPOST(forgotReq(POLICY, '10.12.0.100'));
+    expect(atThreshold.status).toBe(200);
+    const blocked = await forgotPOST(forgotReq(POLICY, '10.12.0.101'));
+    expect(blocked.status).toBe(429);
+
+    // La cubeta por IP de esas requests también respeta SU máximo propio
+    const ipCheck = await checkRateLimit(
+      'forgot-password:ip:10.12.0.100',
+      FORGOT_IP_MAX_ATTEMPTS,
+      FORGOT_WINDOW_MS
+    );
+    expect(ipCheck.isBlocked).toBe(false); // solo 1 intento en esa cubeta IP
+  });
+
+  it('POLÍTICA: blockedUntil/retryAfterSeconds corresponden al lockout definido (30 min)', async () => {
+    const POLICY = '3003332211';
+    for (let i = 1; i <= FORGOT_ID_MAX_ATTEMPTS; i++) {
+      await forgotPOST(forgotReq(POLICY, `10.13.0.${i}`));
+    }
+
+    const identityKey = `forgot-password:id:57${POLICY}`; // clave CANÓNICA
+    const before = Date.now();
+    const check = await checkRateLimit(identityKey, FORGOT_ID_MAX_ATTEMPTS, FORGOT_WINDOW_MS);
+
+    expect(check.isBlocked).toBe(true);
+    expect(check.blockedUntil).toBeDefined();
+    // blockedUntil = momento del registro + FORGOT_LOCKOUT_MS (30 min)
+    const lockoutMs = check.blockedUntil!.getTime() - before;
+    expect(lockoutMs).toBeGreaterThan(FORGOT_LOCKOUT_MS - 5000);
+    expect(lockoutMs).toBeLessThanOrEqual(FORGOT_LOCKOUT_MS + 2000);
+
+    // retryAfterSeconds del 429 es coherente con el MISMO lockout (no otro valor)
+    const blocked = await forgotPOST(forgotReq(POLICY, '10.13.0.200'));
+    const json = await blocked.json();
+    expect(blocked.status).toBe(429);
+    expect(json.retryAfterSeconds).toBeGreaterThan((FORGOT_LOCKOUT_MS - 5000) / 1000);
+    expect(json.retryAfterSeconds).toBeLessThanOrEqual(FORGOT_LOCKOUT_MS / 1000);
   });
 });

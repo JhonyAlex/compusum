@@ -126,10 +126,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // recalcula server-side con el contexto del dueño del carrito (dato del
     // servidor, no del cliente); si es un carrito de invitado, precio base.
     //
-    // `items: []` => VACIAR el carrito: la escritura resultante elimina TODOS
-    // los items y deja subtotal 0 (antes se dejaban los items con subtotal 0).
+    // Semántica de `items`:
+    //   - undefined/null  => actualización SOLO de metadata: se conservan los
+    //     items Y el subtotal existente (no repreciar, no tocar líneas).
+    //   - []              => VACIAR el carrito: elimina TODOS los items y
+    //     subtotal 0.
+    //   - [...]           => validar y repreciar server-side; reemplazar
+    //     items y subtotal con el resultado validado.
+    // El subtotal SOLO se escribe cuando `items` viene en el body: un PUT de
+    // solo notas nunca puede dejar líneas con subtotal 0.
+    const itemsProvided = Array.isArray(items);
     let validatedResult: Awaited<ReturnType<typeof validateAndPriceItems>> | undefined;
-    if (items && Array.isArray(items) && items.length > 0) {
+    if (itemsProvided && items.length > 0) {
       let ownerPricingCustomerId: string | null = null;
       if (existingCart.userId) {
         const owner = await db.user.findUnique({
@@ -171,8 +179,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         customerCompany,
         cityId: cityId || null,
         notes,
-        subtotal: validatedResult?.subtotal ?? 0,
-        ...(Array.isArray(items)
+        subtotal: itemsProvided ? (validatedResult?.subtotal ?? 0) : existingCart.subtotal,
+        ...(itemsProvided
           ? {
               items: {
                 deleteMany: {},

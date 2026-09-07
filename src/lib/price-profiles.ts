@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { Prisma } from "@prisma/client";
 
 /**
  * Administración de perfiles de precio (listas comerciales).
@@ -14,6 +15,42 @@ export class PriceProfileAdminError extends Error {
     this.name = "PriceProfileAdminError";
     this.code = code;
   }
+}
+
+/**
+ * La migración crea un índice único parcial (UNA sola fila isDefault=true).
+ * Por eso el orden de escritura es OBLIGATORIO: DESMARCAR el default vigente
+ * ANTES de crear/promover el nuevo. Si dos operaciones concurrentes chocan,
+ * el índice rechaza la segunda escritura (P2002) => error controlado y nunca
+ * dos defaults.
+ */
+function demoteCurrentDefault(tx: any, exceptProfileId?: string): Promise<unknown> {
+  return tx.priceProfile.updateMany({
+    where: {
+      isDefault: true,
+      ...(exceptProfileId ? { id: { not: exceptProfileId } } : {}),
+    },
+    data: { isDefault: false },
+  });
+}
+
+/**
+ * Traduce una violación de unicidad concurrente (P2002) a un error controlado.
+ * El índice parcial sobre ("isDefault") WHERE "isDefault" es la defensa
+ * definitiva: a lo sumo UN default aunque dos requests corran en paralelo.
+ */
+function rethrowUniqueViolation(error: unknown): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    const target = JSON.stringify(error.meta?.target ?? "");
+    if (target.includes("code")) {
+      throw new PriceProfileAdminError("CODE_EXISTS", "Ya existe un perfil con ese código.");
+    }
+    throw new PriceProfileAdminError(
+      "DEFAULT_CONFLICT",
+      "Otro perfil acaba de marcarse como predeterminado. Recarga e inténtalo de nuevo."
+    );
+  }
+  throw error as Error;
 }
 
 export interface ProfileOverrideInput {
@@ -86,20 +123,6 @@ function validateOverrides(input: PriceProfileInput): void {
       );
     }
   }
-}
-
-/**
- * Mantiene la exclusividad del perfil por defecto: al marcar isDefault en un
- * perfil, se desmarca el resto (transaccionalmente cuando hay tx).
- */
-export async function ensureSingleDefaultProfile(
-  profileId: string,
-  tx: any = db
-): Promise<void> {
-  await tx.priceProfile.updateMany({
-    where: { isDefault: true, id: { not: profileId } },
-    data: { isDefault: false },
-  });
 }
 
 function normalizePercent(value: number | null | undefined): number | null {
@@ -180,19 +203,27 @@ export async function createPriceProfile(input: PriceProfileInput) {
 
     await validateOverrideReferences(input, tx);
 
-    const profile = await tx.priceProfile.create({
-      data: {
-        name,
-        code,
-        description: input.description?.trim().slice(0, 500) || null,
-        percentAdjustment: normalizePercent(input.percentAdjustment),
-        isActive: input.isActive ?? true,
-        isDefault: input.isDefault ?? false,
-      },
-    });
+    // Con el índice único parcial vigente, marcar default exige desmarcar el
+    // anterior PRIMERO: crear directamente con isDefault=true sería rechazado
+    // por PostgreSQL si ya existiera otro default.
+    if (input.isDefault) {
+      await demoteCurrentDefault(tx);
+    }
 
-    if (profile.isDefault) {
-      await ensureSingleDefaultProfile(profile.id, tx);
+    let profile;
+    try {
+      profile = await tx.priceProfile.create({
+        data: {
+          name,
+          code,
+          description: input.description?.trim().slice(0, 500) || null,
+          percentAdjustment: normalizePercent(input.percentAdjustment),
+          isActive: input.isActive ?? true,
+          isDefault: input.isDefault ?? false,
+        },
+      });
+    } catch (error) {
+      rethrowUniqueViolation(error);
     }
 
     await replaceOverrides(profile.id, input, tx);
@@ -243,10 +274,17 @@ export async function updatePriceProfile(id: string, input: PriceProfileInput) {
     validateOverrides(input);
     await validateOverrideReferences(input, tx);
 
-    const updated = await tx.priceProfile.update({ where: { id }, data });
+    // Promoción a default: desmarcar el default vigente ANTES del update;
+    // el update directo con isDefault=true chocaría con el índice único
+    // parcial si otro perfil ya es default.
+    if (input.isDefault) {
+      await demoteCurrentDefault(tx, id);
+    }
 
-    if (updated.isDefault) {
-      await ensureSingleDefaultProfile(id, tx);
+    try {
+      await tx.priceProfile.update({ where: { id }, data });
+    } catch (error) {
+      rethrowUniqueViolation(error);
     }
 
     if (input.productOverrides !== undefined || input.variantOverrides !== undefined) {

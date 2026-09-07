@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requestPasswordReset, CustomerAuthError } from '@/lib/customer-auth';
 import { isPhoneOtpLoginEnabled } from '@/lib/auth-dual';
-import { checkRateLimit, recordFailedAttempt, getClientIp } from '@/lib/rate-limit';
+import {
+  checkRateLimit,
+  recordFailedAttempt,
+  getClientIp,
+  FORGOT_IP_MAX_ATTEMPTS,
+  FORGOT_ID_MAX_ATTEMPTS,
+  FORGOT_WINDOW_MS,
+  FORGOT_LOCKOUT_MS,
+} from '@/lib/rate-limit';
 import { canonicalColombiaPhone } from '@/lib/phone';
-
-const FORGOT_MAX_ATTEMPTS = 5;
-const FORGOT_WINDOW_MS = 15 * 60 * 1000;
-const FORGOT_LOCKOUT_MS = 30 * 60 * 1000;
 
 /**
  * Solicitud de restablecimiento de contraseña. La respuesta es SIEMPRE genérica
@@ -33,9 +37,13 @@ export async function POST(req: NextRequest) {
       identifierKey = `forgot-password:id:${identity}`;
     }
 
-    // Verificar AMBAS capas ANTES de procesar nada
-    for (const key of [ipKey, ...(identifierKey ? [identifierKey] : [])]) {
-      const limit = await checkRateLimit(key, FORGOT_MAX_ATTEMPTS, FORGOT_WINDOW_MS);
+    // Verificar AMBAS capas ANTES de procesar nada. Cada cubeta usa EXACTAMENTE
+    // el mismo máximo/ventana/lockout en check y en record (constantes únicas).
+    for (const [key, maxAttempts] of [
+      [ipKey, FORGOT_IP_MAX_ATTEMPTS],
+      ...(identifierKey ? [[identifierKey, FORGOT_ID_MAX_ATTEMPTS] as const] : []),
+    ] as const) {
+      const limit = await checkRateLimit(key, maxAttempts, FORGOT_WINDOW_MS);
       if (limit.isBlocked) {
         return NextResponse.json(
           {
@@ -62,9 +70,16 @@ export async function POST(req: NextRequest) {
 
     const recordAttempts = () =>
       Promise.all([
-        recordFailedAttempt(ipKey, FORGOT_MAX_ATTEMPTS, FORGOT_WINDOW_MS, FORGOT_LOCKOUT_MS),
+        recordFailedAttempt(ipKey, FORGOT_IP_MAX_ATTEMPTS, FORGOT_WINDOW_MS, FORGOT_LOCKOUT_MS),
         ...(identifierKey
-          ? [recordFailedAttempt(identifierKey, FORGOT_MAX_ATTEMPTS * 4, FORGOT_WINDOW_MS, FORGOT_LOCKOUT_MS)]
+          ? [
+              recordFailedAttempt(
+                identifierKey,
+                FORGOT_ID_MAX_ATTEMPTS,
+                FORGOT_WINDOW_MS,
+                FORGOT_LOCKOUT_MS
+              ),
+            ]
           : []),
       ]);
 
