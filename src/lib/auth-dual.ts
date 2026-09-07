@@ -54,13 +54,12 @@ export async function sendPhoneOtp(phone: string): Promise<{ provider: 'twilio' 
   return { provider: 'twilio' };
 }
 
-export async function loginWithPhone(
-  phone: string,
-  otpCode: string,
-  sessionDurationHours = 24
-): Promise<{ token: string; user: any }> {
+/**
+ * Verifica un código OTP para un teléfono. Reutilizada por login y por el
+ * restablecimiento de contraseña (la expiración la gestiona el proveedor).
+ */
+export async function verifyPhoneOtp(phone: string, otpCode: string): Promise<void> {
   const e164Phone = toE164Phone(phone);
-  const normalizedPhone = normalizePhoneInput(e164Phone);
   const normalizedOtpCode = otpCode.replace(/\D/g, '');
 
   if (normalizedOtpCode.length !== PHONE_OTP_LENGTH) {
@@ -79,8 +78,23 @@ export async function loginWithPhone(
     const isValidTwilioOtp = await checkOtpWithTwilio(e164Phone, normalizedOtpCode);
     if (!isValidTwilioOtp) throw new Error('Código inválido o expirado');
   }
+}
+
+export async function loginWithPhone(
+  phone: string,
+  otpCode: string,
+  sessionDurationHours = 24
+): Promise<{ token: string; user: any }> {
+  const e164Phone = toE164Phone(phone);
+  const normalizedPhone = normalizePhoneInput(e164Phone);
+
+  await verifyPhoneOtp(phone, otpCode);
 
   let user = await db.user.findUnique({ where: { phone: normalizedPhone } });
+
+  if (user && !user.isActive) {
+    throw new Error('Tu cuenta está desactivada. Contacta a tu asesor comercial.');
+  }
 
   if (!user) {
     user = await db.user.create({
@@ -101,17 +115,22 @@ export async function loginWithPassword(
   passwordPlain: string,
   sessionDurationHours = 24
 ): Promise<{ token: string; user: any }> {
+  const identifier = phoneOrEmail?.trim().toLowerCase();
   const user = await db.user.findFirst({
     where: {
       OR: [
-        { phone: phoneOrEmail },
-        { email: phoneOrEmail }
+        { phone: identifier },
+        { email: identifier }
       ]
     }
   });
 
   if (!user || !user.password) {
     throw new Error("Usa tu número de teléfono para ingresar o configura una contraseña.");
+  }
+
+  if (!user.isActive) {
+    throw new Error("Tu cuenta está desactivada. Contacta a tu asesor comercial.");
   }
 
   const isValid = await verifyPassword(passwordPlain, user.password);

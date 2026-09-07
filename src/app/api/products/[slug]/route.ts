@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { isGlobalCatalogModeEnabled, sanitizeProductForCatalog } from '@/lib/catalog-mode';
+import { attachResolvedPrices } from '@/lib/pricing';
+import { getSessionPricingContext } from '@/lib/pricing-context';
 
 // GET /api/products/[slug] - Get product by slug
 export async function GET(
@@ -49,11 +51,17 @@ export async function GET(
       data: { viewsCount: { increment: 1 } },
     });
 
-    const sanitizedProduct = sanitizeProductForCatalog(product, isCatalogMode);
+    // Motor único de precios: resolvedPrice del producto y sus variantes
+    // según la sesión (batch, sin N+1)
+    const pricingCtx = await getSessionPricingContext();
+    const [pricedProduct] = await attachResolvedPrices(
+      [sanitizeProductForCatalog(product, isCatalogMode)],
+      pricingCtx
+    );
 
     return NextResponse.json({
       success: true,
-      data: sanitizedProduct,
+      data: pricedProduct,
     });
   } catch (error) {
     console.error('Error fetching product:', error);

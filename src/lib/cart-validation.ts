@@ -1,4 +1,9 @@
 import { db } from "./db";
+import {
+  getActivePriceProfile,
+  loadProfileOverrides,
+  resolvePricesFromProductMap,
+} from "./pricing";
 
 export class CartValidationError extends Error {
   constructor(message: string) {
@@ -30,17 +35,29 @@ export interface ValidationResult {
   subtotal: number;
 }
 
+export interface ValidateAndPriceOptions {
+  /**
+   * Cliente (User role CUSTOMER) que determina el precio del carrito.
+   * DEBE provenir de la sesión autenticada server-side o de una acción
+   * administrativa autorizada — nunca de datos enviados por el navegador.
+   * Invitado => null => precio base/default autorizado para invitados.
+   */
+  customerId?: string | null;
+}
+
 /**
  * Valida items de carrito contra la base de datos:
  * - Verifica que existan productos y estén activos
  * - Verifica disponiblidad de stock (stockStatus != 'agotado')
  * - Valida relación producto-variante y estado de la variante
  * - Enfuerza cantidad mínima mayorista (minWholesaleQty)
+ * - Resuelve TODA la resolución monetaria vía el motor único (src/lib/pricing.ts)
  * - Recalcula precios unitarios y subtotal exclusivamente desde BD
  */
 export async function validateAndPriceItems(
   items: InputCartItem[],
-  tx: any = db
+  tx: any = db,
+  options: ValidateAndPriceOptions = {}
 ): Promise<ValidationResult> {
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new CartValidationError("El carrito debe tener al menos un producto.");
@@ -61,6 +78,21 @@ export async function validateAndPriceItems(
 
   const productMap = new Map<string, (typeof products)[number]>(
     products.map((p: (typeof products)[number]) => [p.id, p])
+  );
+
+  // Motor único de precios: resolución batch (perfil del cliente + overrides)
+  const profile = await getActivePriceProfile(options.customerId, tx);
+  const variantIds = Array.from(
+    new Set(items.map((i) => i.variantId).filter(Boolean) as string[])
+  );
+  const overrides = profile
+    ? await loadProfileOverrides(profile, productIds, variantIds, tx)
+    : undefined;
+  const { prices: resolvedPrices } = resolvePricesFromProductMap(
+    items,
+    productMap,
+    profile,
+    overrides
   );
 
   // Track aggregated requested quantities by target key to prevent overselling through split lines
@@ -111,7 +143,6 @@ export async function validateAndPriceItems(
       );
     }
 
-    let unitPrice = 0;
     let variantName: string | null = null;
     let variantCode: string | null = null;
     let variantId: string | null = null;
@@ -149,12 +180,6 @@ export async function validateAndPriceItems(
       variantId = variant.id;
       variantName = variant.name;
       variantCode = variant.code;
-      unitPrice =
-        variant.wholesalePrice ??
-        variant.price ??
-        product.wholesalePrice ??
-        product.price ??
-        0;
     } else {
       // Validar inventario numérico del producto sin variante (no permitir sobreventa silenciosa)
       const availableProductStock = product.stockQuantity ?? 0;
@@ -164,9 +189,11 @@ export async function validateAndPriceItems(
           `No hay suficiente disponibilidad para "${product.name}". Solicitado: ${totalRequested}, disponible: ${availableProductStock}.`
         );
       }
-
-      unitPrice = product.wholesalePrice ?? product.price ?? 0;
     }
+
+    // Precio resuelto EXCLUSIVAMENTE por el motor server-side
+    const resolved = resolvedPrices.get(`${product.id}::${item.variantId || ""}`);
+    const unitPrice = resolved?.unitPrice ?? 0;
 
     if (unitPrice <= 0) {
       const displayName = variantName ? `"${product.name} (${variantName})"` : `"${product.name}"`;

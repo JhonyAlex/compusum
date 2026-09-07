@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cart is not active' }, { status: 400 });
     }
 
-    const result = await processCheckout(checkoutData);
+    const result = await processCheckout(checkoutData, { sessionUser: currentUser });
 
     return NextResponse.json({
         message: 'Checkout successful',

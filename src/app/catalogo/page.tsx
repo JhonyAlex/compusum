@@ -13,6 +13,8 @@ import { CatalogSortSelector } from "@/components/store/catalog-sort-selector";
 import Link from "next/link";
 import { getCachedCategories, getCachedBrands, getCachedGlobalCatalogMode } from "@/lib/product-cache";
 import { searchProducts } from "@/lib/product-search";
+import { attachResolvedPrices } from "@/lib/pricing";
+import { getSessionPricingContext } from "@/lib/pricing-context";
 import { 
   SlidersHorizontal, 
   X, 
@@ -128,6 +130,10 @@ export default async function CatalogoPage({ searchParams }: PageProps) {
       brand: p.brandName ? { name: p.brandName, slug: p.brandSlug!, catalogMode: p.brandCatalogMode } : null,
     }));
     totalProducts = searchResult.total;
+
+    // Motor único de precios: resolvedPrice por sesión (batch, sin N+1)
+    const pricingCtx = await getSessionPricingContext();
+    products = await attachResolvedPrices(products, pricingCtx);
   } catch (error) {
     console.error("CatalogoPage query failed", error);
   }

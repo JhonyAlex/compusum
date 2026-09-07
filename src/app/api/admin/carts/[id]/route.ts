@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdminApi } from "@/lib/auth";
+import { validateAndPriceItems, CartValidationError } from "@/lib/cart-validation";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -62,30 +63,69 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (notes !== undefined) data.notes = notes || null;
 
     if (items && Array.isArray(items)) {
-      const subtotal = items.reduce((sum: number, item: { quantity: number; unitPrice?: number }) => {
-        return sum + (item.unitPrice || 0) * item.quantity;
-      }, 0);
-      data.subtotal = subtotal;
-
-      const cart = await db.$transaction(async (tx) => {
-        await tx.cartItem.deleteMany({ where: { cartId: id } });
-        return tx.cart.update({
-          where: { id },
-          data: {
-            ...data,
-            items: {
-              create: items.map((item: { productId: string; quantity: number; unitPrice?: number }) => ({
-                productId: item.productId,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice || 0,
-              })),
-            },
-          },
-          include: { items: true },
-        });
+      // Motor único de precios: el precio se resuelve server-side (perfil del
+      // dueño del carrito o precio base). El navegador no decide precios, ni
+      // siquiera en administración; la edición monetaria de pedidos se hace
+      // explícitamente en el PATCH del pedido.
+      const targetCart = await db.cart.findUnique({
+        where: { id },
+        select: { userId: true },
       });
 
-      return NextResponse.json({ success: true, data: cart, message: "Carrito actualizado" });
+      let ownerPricingCustomerId: string | null = null;
+      if (targetCart?.userId) {
+        const owner = await db.user.findUnique({
+          where: { id: targetCart.userId },
+          select: { id: true, role: true },
+        });
+        if (owner && owner.role.toLowerCase() === "customer") {
+          ownerPricingCustomerId = owner.id;
+        }
+      }
+
+      try {
+        const { validatedItems, subtotal } = await validateAndPriceItems(
+          items.map((item: { productId: string; variantId?: string | null; quantity: number }) => ({
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            quantity: item.quantity,
+          })),
+          db,
+          { customerId: ownerPricingCustomerId }
+        );
+        data.subtotal = subtotal;
+
+        const cart = await db.$transaction(async (tx) => {
+          await tx.cartItem.deleteMany({ where: { cartId: id } });
+          return tx.cart.update({
+            where: { id },
+            data: {
+              ...data,
+              items: {
+                create: validatedItems.map((item) => ({
+                  productId: item.productId,
+                  variantId: item.variantId,
+                  variantName: item.variantName,
+                  variantCode: item.variantCode,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice,
+                })),
+              },
+            },
+            include: { items: true },
+          });
+        });
+
+        return NextResponse.json({ success: true, data: cart, message: "Carrito actualizado" });
+      } catch (err) {
+        if (err instanceof CartValidationError) {
+          return NextResponse.json(
+            { success: false, error: err.message },
+            { status: 400 }
+          );
+        }
+        throw err;
+      }
     }
 
     const cart = await db.cart.update({

@@ -4,6 +4,8 @@ import { Prisma } from "@prisma/client";
 import { upsertCart, upsertActiveCart } from "@/lib/order-cart-upsert";
 import { getCurrentUser } from "@/lib/auth";
 import { validateAndPriceItems, CartValidationError } from "@/lib/cart-validation";
+import { attachResolvedPricesToCartItems, resolveServerPricingCustomer } from "@/lib/pricing";
+import { getSessionPricingContext } from "@/lib/pricing-context";
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,8 +60,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Motor único de precios: el contexto del cliente SOLO procede de la
+    // sesión autenticada (o de ADMIN/AGENT resolviendo el contacto server-side).
+    // Un invitado que escriba el email/teléfono de otro cliente recibe
+    // exclusivamente el precio base/default autorizado para invitados.
+    const pricingCustomerId = await resolveServerPricingCustomer(currentUser, {
+      phone: customerPhone,
+      email: customerEmail,
+    });
+
     try {
-      validatedResult = await validateAndPriceItems(items);
+      validatedResult = await validateAndPriceItems(items, db, {
+        customerId: pricingCustomerId,
+      });
     } catch (err) {
       if (err instanceof CartValidationError) {
         return NextResponse.json(
@@ -282,9 +295,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Motor único de precios: cada item expone resolvedPrice del VISOR
+    // (sesión server-side). Nunca se expone el precio de perfil de otro usuario.
+    const pricingCtx = await getSessionPricingContext();
+    const pricedCart = await attachResolvedPricesToCartItems(cart, pricingCtx);
+
     return NextResponse.json({
       success: true,
-      data: cart,
+      data: pricedCart,
     });
   } catch (error) {
     console.error("Error fetching cart:", error);

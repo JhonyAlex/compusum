@@ -2,6 +2,7 @@ import { db } from './db';
 import { hashPassword } from './auth';
 import { Prisma } from '@prisma/client';
 import { validateAndPriceItems } from './cart-validation';
+import { resolveServerPricingCustomer } from './pricing';
 import { generateOrderNumber, createOrderTransactionWithRetry } from './order-number';
 import { getNextRouteDeparture } from './route-schedule';
 
@@ -116,6 +117,61 @@ export async function upsertCheckoutCustomer(
   }
 }
 
+export interface SessionUserRef {
+  id: string;
+  role: string;
+}
+
+/**
+ * Resuelve el cliente (y su asesor asignado) al que se asociará un pedido.
+ *
+ * - Cliente autenticado (rol CUSTOMER) => su propia cuenta es el maestro; el
+ *   contacto del body solo complementa datos faltantes, nunca cambia la linked
+ *   account ni el asesor.
+ * - Invitado o ADMIN/AGENT => upsert por contacto (comportamiento existente
+ *   preservado para checkout de invitados y ventas asistidas).
+ */
+export async function resolveOrderCustomer(
+  sessionUser: SessionUserRef | null | undefined,
+  input: { name?: string | null; phone?: string | null; email?: string | null },
+  tx: any = db
+) {
+  if (sessionUser?.role?.toLowerCase() === 'customer') {
+    let customer = await tx.user.findUnique({ where: { id: sessionUser.id } });
+
+    if (customer && customer.isActive) {
+      const updateData: Record<string, string> = {};
+      const phone = normalizePhone(input.phone);
+      const email = normalizeEmail(input.email);
+
+      if (phone && !customer.phone) updateData.phone = phone;
+      if (email && !customer.email) updateData.email = email;
+
+      const incomingName = input.name?.trim();
+      if (incomingName && (!customer.name || customer.name === 'Nuevo Cliente')) {
+        updateData.name = incomingName.slice(0, 200);
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        customer = await tx.user.update({
+          where: { id: customer.id },
+          data: updateData,
+        });
+      }
+
+      return {
+        customer,
+        assignedAgentId: customer.assignedAgentId ?? null,
+        normalizedPhone: normalizePhone(input.phone),
+        normalizedEmail: normalizeEmail(input.email),
+        isNewCustomer: false,
+      };
+    }
+  }
+
+  return upsertCheckoutCustomer(input, tx);
+}
+
 export async function findBestRouteForCity(cityId?: string | null, now = new Date(), tx: any = db) {
   if (!cityId) return null;
 
@@ -160,12 +216,40 @@ export async function findBestRouteForCity(cityId?: string | null, now = new Dat
   return routesWithNextDeparture[0]?.route || null;
 }
 
-export async function processCheckout(checkoutData: any) {
+export interface ProcessCheckoutOptions {
+  /**
+   * Usuario de la sesión autenticada server-side (getCurrentUser()).
+   * Determina el enlace del pedido y el contexto del motor de precios.
+   * JAMÁS se acepta un customerId desde el navegador.
+   */
+  sessionUser?: SessionUserRef | null;
+}
+
+export async function processCheckout(
+  checkoutData: any,
+  options: ProcessCheckoutOptions = {}
+) {
   const { phone, email, name, items, cityId, cartId } = checkoutData;
+  const sessionUser = options.sessionUser ?? null;
 
   return createOrderTransactionWithRetry(async (tx: any) => {
-    const { validatedItems, subtotal } = await validateAndPriceItems(items, tx);
-    const customerResult = await upsertCheckoutCustomer({ name, phone, email }, tx);
+    // El cliente que determina el precio SOLO procede de la sesión
+    // autenticada o de una acción administrativa (nunca del body del invitado).
+    const pricingCustomerId = await resolveServerPricingCustomer(
+      sessionUser,
+      { phone, email },
+      tx
+    );
+
+    const { validatedItems, subtotal } = await validateAndPriceItems(items, tx, {
+      customerId: pricingCustomerId,
+    });
+
+    const customerResult = await resolveOrderCustomer(
+      sessionUser,
+      { name, phone, email },
+      tx
+    );
     const availableRoute = await findBestRouteForCity(cityId, new Date(), tx);
     const orderNumber = await generateOrderNumber(tx);
 

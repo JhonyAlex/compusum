@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { searchProducts } from '@/lib/product-search';
 import { isGlobalCatalogModeEnabled, sanitizeProductsForCatalog } from '@/lib/catalog-mode';
+import { attachResolvedPrices } from '@/lib/pricing';
+import { getSessionPricingContext } from '@/lib/pricing-context';
 
 // GET /api/products - List products with filters
 export async function GET(request: Request) {
@@ -76,12 +78,17 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    const sanitizedProducts = sanitizeProductsForCatalog(result.products, isCatalogMode);
+    // Motor único de precios: adjunta resolvedPrice por usuario de sesión
+    const pricingCtx = await getSessionPricingContext();
+    const pricedProducts = await attachResolvedPrices(
+      sanitizeProductsForCatalog(result.products, isCatalogMode),
+      pricingCtx
+    );
 
     return NextResponse.json({
       success: true,
       data: {
-        products: sanitizedProducts,
+        products: pricedProducts,
         pagination: {
           page,
           limit,

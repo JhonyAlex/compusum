@@ -5,6 +5,8 @@ import { WhatsAppButton } from "@/components/store/whatsapp-button";
 import { notFound } from "next/navigation";
 import { SharedCartView } from "@/components/store/shared-cart-view";
 import { isGlobalCatalogModeEnabled } from "@/lib/catalog-mode";
+import { getSessionPricingContext } from "@/lib/pricing-context";
+import { attachResolvedPricesToCartItems } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -57,34 +59,46 @@ export default async function SharedCartPage({ params }: PageProps) {
     notFound();
   }
 
+  // Motor único de precios: resolvedPrice por VISOR (sesión server-side).
+  // Un invitado que abre un carrito compartido ve su precio autorizado,
+  // nunca el precio de perfil del dueño.
+  let viewerCart: typeof cart = cart;
+  try {
+    const pricingCtx = await getSessionPricingContext();
+    viewerCart = await attachResolvedPricesToCartItems(cart, pricingCtx);
+  } catch (error) {
+    console.error("Shared cart price resolution failed", error);
+  }
+
   // Serialize for client component
   const cartData = {
-    uuid: cart.uuid,
-    customerName: cart.customerName,
-    customerEmail: cart.customerEmail,
-    customerPhone: cart.customerPhone,
-    customerCompany: cart.customerCompany,
-    notes: cart.notes,
-    subtotal: cart.subtotal,
-    status: cart.status,
-    city: cart.city
+    uuid: viewerCart.uuid,
+    customerName: viewerCart.customerName,
+    customerEmail: viewerCart.customerEmail,
+    customerPhone: viewerCart.customerPhone,
+    customerCompany: viewerCart.customerCompany,
+    notes: viewerCart.notes,
+    subtotal: viewerCart.subtotal,
+    status: viewerCart.status,
+    city: viewerCart.city
       ? {
-          name: cart.city.name,
-          department: cart.city.department.name,
-          shippingRoute: cart.city.shippingRoute
+          name: viewerCart.city.name,
+          department: viewerCart.city.department.name,
+          shippingRoute: viewerCart.city.shippingRoute
             ? {
-                name: cart.city.shippingRoute.name,
-                estimatedDaysMin: cart.city.shippingRoute.estimatedDaysMin,
-                estimatedDaysMax: cart.city.shippingRoute.estimatedDaysMax,
-                shippingCompany: cart.city.shippingRoute.shippingCompany,
+                name: viewerCart.city.shippingRoute.name,
+                estimatedDaysMin: viewerCart.city.shippingRoute.estimatedDaysMin,
+                estimatedDaysMax: viewerCart.city.shippingRoute.estimatedDaysMax,
+                shippingCompany: viewerCart.city.shippingRoute.shippingCompany,
               }
             : null,
         }
       : null,
-    items: cart.items.map((item) => ({
+    items: viewerCart.items.map((item) => ({
       id: item.id,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
+      resolvedPrice: (item as any).resolvedPrice ?? null,
       product: {
         id: item.product.id,
         name: item.product.name,

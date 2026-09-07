@@ -17,6 +17,12 @@ import {
 } from "@/lib/product-fallbacks";
 import type { CartProduct } from "@/stores/cart-store";
 
+interface ResolvedPriceView {
+  unitPrice: number | null;
+  purchasable?: boolean;
+  requiresQuote?: boolean;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -30,6 +36,7 @@ interface Product {
   isNew: boolean;
   catalogMode?: boolean;
   variantCount?: number;
+  resolvedPrice?: ResolvedPriceView | null;
   brand?: {
     name: string;
     slug: string;
@@ -65,6 +72,25 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
     (product.brand?.catalogMode ?? false) ||
     globalCatalogMode;
 
+  // Precio resuelto server-side por sesión (motor único). Fallback legacy
+  // para vistas que aún no reciben resolvedPrice.
+  const resolved = product.resolvedPrice ?? null;
+  const displayPrice: number | null = resolved
+    ? resolved.requiresQuote || resolved.unitPrice == null
+      ? null
+      : resolved.unitPrice
+    : product.wholesalePrice || product.price || null;
+  const hasResolvedPrice = resolved
+    ? !resolved.requiresQuote && resolved.unitPrice != null
+    : Boolean(product.wholesalePrice || product.price);
+
+  // Espejo del precio resuelto en el CartProduct: el carrito del navegador
+  // muestra el precio autorizado; el servidor SIEMPRE recalcula al guardar.
+  const cartProduct: CartProduct =
+    resolved && !resolved.requiresQuote && resolved.unitPrice != null
+      ? { ...(product as CartProduct), price: resolved.unitPrice, wholesalePrice: resolved.unitPrice }
+      : (product as CartProduct);
+
   const stockStatusConfig = {
     disponible: { label: "Disponible", className: "bg-green-50 text-green-700 border-green-200" },
     agotado: { label: "Agotado", className: "bg-slate-50 text-slate-600 border-slate-200" },
@@ -98,9 +124,9 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
               <p className="text-sm text-slate-500 mt-1 italic">
                 Cotizar precio
               </p>
-            ) : product.wholesalePrice ? (
+            ) : hasResolvedPrice ? (
               <p className="text-primary font-semibold text-sm mt-1">
-                {formatPrice(product.wholesalePrice)}
+                {formatPrice(displayPrice!)}
               </p>
             ) : null}
           </div>
@@ -179,20 +205,16 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
             <p className="text-sm text-slate-500 italic">
               Consultar precio
             </p>
-          ) : product.wholesalePrice ? (
+          ) : hasResolvedPrice ? (
             <div>
               <p className="text-lg font-semibold text-primary">
-                {formatPrice(product.wholesalePrice)}
+                {formatPrice(displayPrice!)}
               </p>
               <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                 <Package className="h-3 w-3" />
                 Desde {product.minWholesaleQty} unidades
               </p>
             </div>
-          ) : product.price ? (
-            <p className="text-lg font-semibold text-slate-700">
-              {formatPrice(product.price)}
-            </p>
           ) : (
             <p className="text-sm text-slate-400">
               Consultar precio
@@ -215,7 +237,7 @@ export function ProductCard({ product, variant = "default", globalCatalogMode = 
             </Button>
           ) : (
             <AddToCartButton
-              product={product as CartProduct}
+              product={cartProduct}
               variant="icon"
               className="flex-1"
             />

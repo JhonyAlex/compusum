@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useCustomerAuth } from "@/hooks/use-customer-auth";
 import { LoginModal } from "@/components/store/login-modal";
-import { LogOut, LogIn, Package, User } from "lucide-react";
+import { LogOut, LogIn, Package, User, KeyRound } from "lucide-react";
 
 interface Order {
   id: string;
@@ -86,6 +87,39 @@ export default function MiCuentaPage() {
     router.refresh();
   };
 
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordMsg, setPasswordMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMsg(null);
+    setPasswordLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "No fue posible cambiar la contraseña");
+      }
+      setPasswordMsg({ type: "ok", text: data.message || "Contraseña actualizada" });
+      setCurrentPassword("");
+      setNewPassword("");
+    } catch (err) {
+      setPasswordMsg({
+        type: "err",
+        text: err instanceof Error ? err.message : "Error desconocido",
+      });
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 py-10 px-4">
@@ -154,7 +188,61 @@ export default function MiCuentaPage() {
               </CardHeader>
             </Card>
 
-            {/* Orders Section */}
+            {/* Change Password */}
+            <Card className="bg-white border-slate-200">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-5 w-5 text-slate-500" />
+                    <CardTitle className="text-lg">Contraseña</CardTitle>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPasswordForm((v) => !v)}
+                  >
+                    {showPasswordForm ? "Cancelar" : "Cambiar contraseña"}
+                  </Button>
+                </div>
+              </CardHeader>
+              {showPasswordForm && (
+                <CardContent>
+                  {passwordMsg && (
+                    <p
+                      className={`text-sm mb-3 ${
+                        passwordMsg.type === "ok" ? "text-green-700" : "text-red-600"
+                      }`}
+                    >
+                      {passwordMsg.text}
+                    </p>
+                  )}
+                  <form onSubmit={handleChangePassword} className="space-y-3 max-w-sm">
+                    <Input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      required
+                      placeholder="Contraseña actual"
+                    />
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      minLength={8}
+                      maxLength={72}
+                      placeholder="Nueva contraseña (mínimo 8 caracteres)"
+                    />
+                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={passwordLoading}>
+                      {passwordLoading ? "Guardando..." : "Actualizar contraseña"}
+                    </Button>
+                    <p className="text-xs text-slate-500">
+                      Al cambiarla se cierran las sesiones abiertas en otros dispositivos.
+                    </p>
+                  </form>
+                </CardContent>
+              )}
+            </Card>
             <div>
               <h2 className="text-2xl font-bold text-slate-900 mb-4">Mis Pedidos</h2>
 
