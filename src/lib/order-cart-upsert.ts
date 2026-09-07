@@ -1,11 +1,13 @@
 /**
- * Helpers para gestionar órdenes y carritos con lógica de upsert
+ * Helpers para gestionar carritos con lógica de upsert
  * basada en session_id para usuarios invitados y user_id para usuarios logueados.
+ *
+ * Fase 3: las órdenes ya NO se gestionan con upsert por sesión/cuenta.
+ * Cada checkout crea un Order nuevo (snapshot histórico) — ver
+ * `src/lib/order-create.ts` para la semántica y la protección de doble submit.
  */
 
 import { db } from './db';
-import { Prisma } from '@prisma/client';
-import { generateOrderNumber } from './order-number';
 
 /**
  * Obtiene o crea un carrito activo basado en sessionId o userId
@@ -246,148 +248,6 @@ export async function transferSessionCartToUser(
     },
     include: { items: true },
   });
-}
-
-/**
- * Obtiene o crea una orden activa basada en sessionId o customerId
- * @param sessionId - Session ID del navegador (para usuarios invitados)
- * @param customerId - Customer ID (para usuarios logueados)
- * @returns La orden existente o null
- */
-export async function findActiveOrder(
-  sessionId: string | null | undefined,
-  customerId: string | null | undefined
-) {
-  // Buscar orden activa por sessionId
-  if (sessionId) {
-    return await db.order.findFirst({
-      where: {
-        sessionId,
-        status: 'solicitado',
-      },
-      include: {
-        items: true,
-        statusHistory: true,
-      },
-    });
-  }
-
-  // Buscar orden activa por customerId
-  if (customerId) {
-    return await db.order.findFirst({
-      where: {
-        customerId,
-        status: 'solicitado',
-      },
-      include: {
-        items: true,
-        statusHistory: true,
-      },
-    });
-  }
-
-  return null;
-}
-
-/**
- * Crea o actualiza una orden con lógica de upsert
- * Garantiza un único pedido activo por sesión/usuario
- * @param orderData - Datos de la orden
- * @param cartId - ID del carrito
- * @param sessionId - Session ID del navegador
- * @param customerId - Customer ID
- * @param tx - Transacción de Prisma (opcional)
- * @returns La orden creada o actualizada
- */
-export async function upsertOrder(
-  orderData: {
-    orderNumber?: string;
-    customerName?: string | null;
-    customerEmail?: string | null;
-    customerPhone?: string | null;
-    customerCompany?: string | null;
-    cityId?: string | null;
-    routeId?: string | null;
-    notes?: string | null;
-    agentId?: string | null;
-    subtotal: number;
-    sentVia?: string | null;
-    items: Array<{
-      productId: string;
-      productName: string;
-      productSku?: string | null;
-      variantId?: string | null;
-      variantName?: string | null;
-      variantCode?: string | null;
-      quantity: number;
-      unitPrice: number | null;
-    }>;
-  },
-  cartId: string,
-  sessionId: string | null | undefined,
-  customerId: string | null | undefined,
-  tx: any = db
-) {
-  // Buscar orden activa existente
-  let existingOrder = null;
-
-  if (sessionId) {
-    existingOrder = await tx.order.findFirst({
-      where: {
-        sessionId,
-        status: 'solicitado',
-      },
-    });
-  } else if (customerId) {
-    existingOrder = await tx.order.findFirst({
-      where: {
-        customerId,
-        status: 'solicitado',
-      },
-    });
-  }
-
-  // Si existe orden activa, actualizarla
-  if (existingOrder) {
-    // Eliminar items anteriores
-    await tx.orderItem.deleteMany({
-      where: { orderId: existingOrder.id },
-    });
-
-    // Actualizar orden
-    const updated = await tx.order.update({
-      where: { id: existingOrder.id },
-      data: {
-        ...orderData,
-        items: {
-          create: orderData.items,
-        },
-        updatedAt: new Date(),
-      },
-      include: { items: true },
-    });
-
-    return updated;
-  }
-
-  // Si no existe, crear nueva orden
-  const orderNumber = orderData.orderNumber || (await generateOrderNumber(tx));
-
-  const created = await tx.order.create({
-    data: {
-      orderNumber,
-      cartId,
-      sessionId: sessionId || null,
-      customerId: customerId || null,
-      ...orderData,
-      items: {
-        create: orderData.items,
-      },
-    },
-    include: { items: true },
-  });
-
-  return created;
 }
 
 /**

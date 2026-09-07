@@ -2,13 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { validateAndPriceItems, CartValidationError } from "@/lib/cart-validation";
+import {
+  authorizeCartViewer,
+  buildSharedCartDTO,
+  getCartViewer,
+} from "@/lib/shared-cart";
 import { attachResolvedPricesToCartItems } from "@/lib/pricing";
 import { getSessionPricingContext } from "@/lib/pricing-context";
+import { isGlobalCatalogModeEnabled } from "@/lib/catalog-mode";
 
 interface RouteParams {
   params: Promise<{ uuid: string }>;
 }
 
+/**
+ * GET /api/carts/[uuid] — MISMA política y MISMO DTO que la página
+ * /carrito/[uuid] (capability-link, ver src/lib/shared-cart.ts).
+ * El visor ve SU precio autorizado; nunca el snapshot ni el perfil del dueño;
+ * jamás email/teléfono del propietario.
+ */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { uuid } = await params;
@@ -20,8 +32,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           include: {
             product: {
               include: {
-                brand: { select: { name: true, slug: true } },
-                category: { select: { name: true, slug: true } },
+                brand: { select: { name: true, slug: true, catalogMode: true } },
+                category: { select: { name: true, slug: true, catalogMode: true } },
               },
             },
           },
@@ -35,37 +47,26 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    if (!cart || !cart.isActive) {
+    const viewer = await getCartViewer(request);
+    const access = authorizeCartViewer(cart, viewer);
+
+    if (!cart || !access.allowed) {
       return NextResponse.json(
         { success: false, error: "Carrito no encontrado" },
         { status: 404 }
       );
     }
 
-    // Validar propiedad del carrito
-    const sessionId = request.headers.get("x-session-id");
-    const currentUser = await getCurrentUser();
-    const userId = currentUser?.id ?? null;
-    const userRole = currentUser?.role ?? null;
-    const isAdminOrAgent = userRole === "admin" || userRole === "AGENT";
-
-    const isOwner = (cart.sessionId && cart.sessionId === sessionId) || (userId && cart.userId === userId);
-    const isShared = cart.status === "compartido";
-
-    if (!isAdminOrAgent && !isShared && !isOwner) {
-      return NextResponse.json(
-        { success: false, error: "No tienes permiso para acceder a este carrito" },
-        { status: 403 }
-      );
-    }
-
     // Motor único de precios: resolvedPrice del VISOR (sesión server-side).
-    // Un invitado que abre un carrito compartido ve el precio autorizado para
-    // él, no el snapshot de perfil del dueño.
     const pricingCtx = await getSessionPricingContext();
     const pricedCart = await attachResolvedPricesToCartItems(cart, pricingCtx);
+    const catalogMode = await isGlobalCatalogModeEnabled();
+    const dto = buildSharedCartDTO(pricedCart, catalogMode);
 
-    return NextResponse.json({ success: true, data: pricedCart });
+    return NextResponse.json({
+      success: true,
+      data: { ...dto, canManage: access.canManage },
+    });
   } catch (error) {
     console.error("Error fetching cart:", error);
     return NextResponse.json(
@@ -157,7 +158,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
             quantity: item.quantity,
           })),
           db,
-          { customerId: ownerPricingCustomerId }
+          {
+            customerId: ownerPricingCustomerId,
+            // Fase 3: el carrito (borrador) SÍ puede contener productos que
+            // requieren cotización (unitPrice null).
+            requestType: "cotizacion",
+          }
         );
       } catch (err) {
         if (err instanceof CartValidationError) {
