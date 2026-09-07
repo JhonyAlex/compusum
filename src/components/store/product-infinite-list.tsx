@@ -75,6 +75,7 @@ export function ProductInfiniteList({
           sku: p.sku,
           price: p.price,
           wholesalePrice: p.wholesalePrice,
+          resolvedPrice: p.resolvedPrice ?? null,
           minWholesaleQty: p.minWholesaleQty,
           stockStatus: p.stockStatus,
           isFeatured: p.isFeatured,

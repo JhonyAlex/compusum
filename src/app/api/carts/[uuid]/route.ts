@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { validateAndPriceItems, CartValidationError } from "@/lib/cart-validation";
+import { attachResolvedPricesToCartItems } from "@/lib/pricing";
+import { getSessionPricingContext } from "@/lib/pricing-context";
 
 interface RouteParams {
   params: Promise<{ uuid: string }>;
@@ -56,7 +59,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    return NextResponse.json({ success: true, data: cart });
+    // Motor único de precios: resolvedPrice del VISOR (sesión server-side).
+    // Un invitado que abre un carrito compartido ve el precio autorizado para
+    // él, no el snapshot de perfil del dueño.
+    const pricingCtx = await getSessionPricingContext();
+    const pricedCart = await attachResolvedPricesToCartItems(cart, pricingCtx);
+
+    return NextResponse.json({ success: true, data: pricedCart });
   } catch (error) {
     console.error("Error fetching cart:", error);
     return NextResponse.json(
@@ -71,6 +80,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const { uuid } = await params;
     const body = await request.json();
     const { items, customerName, customerEmail, customerPhone, customerCompany, cityId, notes } = body;
+
+    // Validación de forma: `items` debe ser arreglo o no venir. Un arreglo
+    // VACÍO es semánticamente "vaciar el carrito" (elimina items y subtotal 0).
+    if (items !== undefined && items !== null && !Array.isArray(items)) {
+      return NextResponse.json(
+        { success: false, error: "Formato de items inválido" },
+        { status: 400 }
+      );
+    }
 
     const existingCart = await db.cart.findUnique({ where: { uuid } });
     if (!existingCart || !existingCart.isActive) {
@@ -104,11 +122,51 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Calculate subtotal
-    let subtotal = 0;
-    if (items) {
-      for (const item of items) {
-        if (item.unitPrice) subtotal += item.unitPrice * item.quantity;
+    // Motor único de precios: el precio NUNCA se toma del navegador. Se
+    // recalcula server-side con el contexto del dueño del carrito (dato del
+    // servidor, no del cliente); si es un carrito de invitado, precio base.
+    //
+    // Semántica de `items`:
+    //   - undefined/null  => actualización SOLO de metadata: se conservan los
+    //     items Y el subtotal existente (no repreciar, no tocar líneas).
+    //   - []              => VACIAR el carrito: elimina TODOS los items y
+    //     subtotal 0.
+    //   - [...]           => validar y repreciar server-side; reemplazar
+    //     items y subtotal con el resultado validado.
+    // El subtotal SOLO se escribe cuando `items` viene en el body: un PUT de
+    // solo notas nunca puede dejar líneas con subtotal 0.
+    const itemsProvided = Array.isArray(items);
+    let validatedResult: Awaited<ReturnType<typeof validateAndPriceItems>> | undefined;
+    if (itemsProvided && items.length > 0) {
+      let ownerPricingCustomerId: string | null = null;
+      if (existingCart.userId) {
+        const owner = await db.user.findUnique({
+          where: { id: existingCart.userId },
+          select: { id: true, role: true },
+        });
+        if (owner && owner.role.toLowerCase() === "customer") {
+          ownerPricingCustomerId = owner.id;
+        }
+      }
+
+      try {
+        validatedResult = await validateAndPriceItems(
+          items.map((item: { productId: string; variantId?: string | null; quantity: number }) => ({
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            quantity: item.quantity,
+          })),
+          db,
+          { customerId: ownerPricingCustomerId }
+        );
+      } catch (err) {
+        if (err instanceof CartValidationError) {
+          return NextResponse.json(
+            { success: false, error: err.message },
+            { status: 400 }
+          );
+        }
+        throw err;
       }
     }
 
@@ -121,19 +179,20 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         customerCompany,
         cityId: cityId || null,
         notes,
-        subtotal,
-        ...(items
+        subtotal: itemsProvided ? (validatedResult?.subtotal ?? 0) : existingCart.subtotal,
+        ...(itemsProvided
           ? {
               items: {
                 deleteMany: {},
-                create: items.map((item: { productId: string; variantId?: string | null; variantName?: string | null; variantCode?: string | null; quantity: number; unitPrice?: number }) => ({
-                  productId: item.productId,
-                  variantId: item.variantId || null,
-                  variantName: item.variantName || null,
-                  variantCode: item.variantCode || null,
-                  quantity: item.quantity,
-                  unitPrice: item.unitPrice || null,
-                })),
+                create:
+                  validatedResult?.validatedItems.map((item) => ({
+                    productId: item.productId,
+                    variantId: item.variantId,
+                    variantName: item.variantName,
+                    variantCode: item.variantCode,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                  })) ?? [],
               },
             }
           : {}),

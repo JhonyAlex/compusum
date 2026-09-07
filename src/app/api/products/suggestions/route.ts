@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { searchProductSuggestions } from '@/lib/product-search';
 import { isGlobalCatalogModeEnabled, sanitizeProductsForCatalog } from '@/lib/catalog-mode';
+import { attachResolvedPrices } from '@/lib/pricing';
+import { getSessionPricingContext } from '@/lib/pricing-context';
 
 // GET /api/products/suggestions?q=term - Quick autocomplete suggestions
 export async function GET(request: Request) {
@@ -17,9 +19,14 @@ export async function GET(request: Request) {
       searchProductSuggestions(query, 5),
     ]);
 
-    const sanitizedSuggestions = sanitizeProductsForCatalog(suggestions, isCatalogMode);
+    // Motor único de precios: resolvedPrice por sesión (batch, sin N+1)
+    const pricingCtx = await getSessionPricingContext();
+    const pricedSuggestions = await attachResolvedPrices(
+      sanitizeProductsForCatalog(suggestions, isCatalogMode),
+      pricingCtx
+    );
 
-    return NextResponse.json({ suggestions: sanitizedSuggestions });
+    return NextResponse.json({ suggestions: pricedSuggestions });
   } catch (error) {
     console.error('Error fetching suggestions:', error);
     return NextResponse.json({ suggestions: [] });

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { sendToWebhook, buildWebhookPayload } from "@/lib/webhook";
-import { findBestRouteForCity, normalizeEmail, normalizePhone, upsertCheckoutCustomer } from "@/lib/checkout";
+import { findBestRouteForCity, normalizeEmail, normalizePhone, resolveOrderCustomer } from "@/lib/checkout";
 import { upsertOrder, findActiveOrder } from "@/lib/order-cart-upsert";
 import { getCurrentUser } from "@/lib/auth";
 import { validateAndPriceItems, CartValidationError } from "@/lib/cart-validation";
+import { resolveServerPricingCustomer } from "@/lib/pricing";
 import { generateOrderNumber, createOrderTransactionWithRetry } from "@/lib/order-number";
 
 export async function POST(request: NextRequest) {
@@ -96,6 +97,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar items en base de datos y recalculado exclusivo de subtotal en servidor
+    // Motor único de precios: contexto del cliente SOLO desde sesión autenticada
+    // o resolución autorizada server-side (invitado => precio base/default).
+    const pricingCustomerId = await resolveServerPricingCustomer(currentUser, {
+      phone: normalizedPhone,
+      email: normalizedEmail,
+    });
+
     let validatedResult;
     try {
       validatedResult = await validateAndPriceItems(
@@ -103,7 +111,9 @@ export async function POST(request: NextRequest) {
           productId: item.productId,
           variantId: item.variantId,
           quantity: item.quantity,
-        }))
+        })),
+        db,
+        { customerId: pricingCustomerId }
       );
     } catch (err) {
       if (err instanceof CartValidationError) {
@@ -123,7 +133,8 @@ export async function POST(request: NextRequest) {
     if (existingOrder) {
       // ACTUALIZAR ORDEN EXISTENTE
       const order = await db.$transaction(async (tx) => {
-        const customerResult = await upsertCheckoutCustomer(
+        const customerResult = await resolveOrderCustomer(
+          currentUser,
           {
             name: safeName,
             phone: normalizedPhone,
@@ -212,7 +223,8 @@ export async function POST(request: NextRequest) {
 
     // CREAR NUEVA ORDEN
     const newOrder = await createOrderTransactionWithRetry(async (tx) => {
-      const customerResult = await upsertCheckoutCustomer(
+      const customerResult = await resolveOrderCustomer(
+        currentUser,
         {
           name: safeName,
           phone: normalizedPhone,

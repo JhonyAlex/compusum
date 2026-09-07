@@ -4,6 +4,20 @@ export const ADMIN_LOGIN_MAX_ATTEMPTS = 5;
 export const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutos
 export const ADMIN_LOGIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutos de bloqueo
 
+// ============================================================================
+// POLÍTICA DE FORGOT-PASSWORD (elegida explícitamente, NO accidental):
+//   - Por IP: 5 solicitudes por ventana de 15 min; bloqueo de 30 min.
+//   - Por identidad (teléfono canónico o email en minúsculas): 5 solicitudes
+//     por ventana de 15 min; bloqueo de 30 min.
+// `checkRateLimit` y `recordFailedAttempt` deben recibir EXACTAMENTE estos
+// mismos valores por cubeta: un desajuste (p.ej. check 5 / record 20) hace que
+// el bloqueo ocurra de forma accidental e incoherente con lo reportado.
+// ============================================================================
+export const FORGOT_IP_MAX_ATTEMPTS = 5;
+export const FORGOT_ID_MAX_ATTEMPTS = 5;
+export const FORGOT_WINDOW_MS = 15 * 60 * 1000; // 15 minutos
+export const FORGOT_LOCKOUT_MS = 30 * 60 * 1000; // 30 minutos de bloqueo
+
 export interface RateLimitCheckResult {
   isBlocked: boolean;
   remainingAttempts: number;

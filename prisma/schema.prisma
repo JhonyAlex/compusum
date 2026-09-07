@@ -22,6 +22,19 @@ model User {
   role     String  @default("CUSTOMER") // admin, editor, AGENT, CUSTOMER
   isActive Boolean @default(true)
 
+  // Extensión B2B del maestro de clientes
+  company String?
+  taxId   String? // NIT / identificación fiscal
+  address String?
+  city    String?
+  notes   String?
+
+  priceProfileId String?
+  priceProfile   PriceProfile? @relation(fields: [priceProfileId], references: [id], onDelete: SetNull)
+
+  // Marca de tiempo del último cambio/reset de contraseña (auditoría)
+  passwordChangedAt DateTime?
+
   assignedAgentId String?
   assignedAgent   User?   @relation("AgentCustomers", fields: [assignedAgentId], references: [id])
   customers       User[]  @relation("AgentCustomers")
@@ -32,6 +45,9 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   sessions  Session[]
+
+  @@index([priceProfileId])
+  @@index([role, isActive])
 }
 
 // =====================
@@ -145,6 +161,7 @@ model Product {
   seasons          ProductSeason[]
   variants         ProductVariant[]
   cartItems        CartItem[]
+  priceOverrides   PriceProfileProduct[]
 
   @@index([isActive, createdAt])
   @@index([categoryId, isActive])
@@ -174,6 +191,7 @@ model ProductVariant {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   cartItems      CartItem[]
+  priceOverrides PriceProfileVariant[]
 
   @@unique([productId, normalizedName])
   @@index([productId, isActive, sortOrder])
@@ -504,4 +522,60 @@ model SyncLock {
   holderId   String
   acquiredAt DateTime @default(now())
   expiresAt  DateTime
+}
+
+// =====================
+// PERFILES DE PRECIO (LISTAS COMERCIALES POR CLIENTE)
+// =====================
+// El precio base de Siesa (Product/ProductVariant price y wholesalePrice) sigue siendo
+// la referencia. Los perfiles NO son sobrescritos por la sincronización Siesa: los
+// overrides viven en tablas separadas.
+model PriceProfile {
+  id                String   @id @default(cuid())
+  name              String
+  code              String   @unique
+  description       String?
+  percentAdjustment Float? // Ajuste porcentual general sobre el precio base (ej: -10 => -10%)
+  isActive          Boolean  @default(true)
+  // Informativo para uso futuro: NO participa en la resolución automática de
+  // precios (cliente sin perfil asignado => precio base). Exclusividad
+  // garantizada por índice único parcial (migración 20260907130000).
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  users            User[]
+  productOverrides PriceProfileProduct[]
+  variantOverrides PriceProfileVariant[]
+
+  @@index([isActive])
+}
+
+// Override de precio por producto (modelo separado del de variante para evitar
+// índices únicos con columnas nullable en PostgreSQL).
+model PriceProfileProduct {
+  id             String        @id @default(cuid())
+  profileId      String
+  profile        PriceProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  wholesalePrice Float? // Precio efectivo para el perfil (mayorista)
+  price          Float? // Precio de referencia/alternativo para el perfil
+
+  @@unique([profileId, productId])
+  @@index([productId])
+}
+
+// Override de precio por variante. Gana sobre el override de producto.
+model PriceProfileVariant {
+  id             String         @id @default(cuid())
+  profileId      String
+  profile        PriceProfile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  variantId      String
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  wholesalePrice Float?
+  price          Float?
+
+  @@unique([profileId, variantId])
+  @@index([variantId])
 }

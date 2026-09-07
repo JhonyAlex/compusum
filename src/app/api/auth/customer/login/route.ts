@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { isPhoneOtpLoginEnabled, loginWithPhone, loginWithPassword } from '@/lib/auth-dual';
 import {
   setSessionCookie,
@@ -7,66 +7,51 @@ import {
   rotateGuestSessionCookie,
 } from '@/lib/auth';
 import { transferSessionCartToUser, transferSessionOrderToUser } from '@/lib/order-cart-upsert';
+import { toAuthUserDTO } from '@/lib/user-dto';
+import { checkRateLimit, recordFailedAttempt, resetRateLimit, getClientIp } from '@/lib/rate-limit';
 
 type LoginMethod = 'phone' | 'password';
 
-type AttemptEntry = {
-  count: number;
-  firstAttemptAt: number;
-};
+// Rate limiting PERSISTENTE (tabla RateLimit; no en memoria) por IP e
+// identidad intentada, con reset al lograr autenticar.
+const LOGIN_MAX_ATTEMPTS = 10;
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_LOCKOUT_MS = 10 * 60 * 1000;
 
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
-const RATE_LIMIT_MAX_ATTEMPTS = 10;
-
-const globalForRateLimit = globalThis as typeof globalThis & {
-  __customerLoginAttempts?: Map<string, AttemptEntry>;
-};
-
-const attemptStore = globalForRateLimit.__customerLoginAttempts ?? new Map<string, AttemptEntry>();
-globalForRateLimit.__customerLoginAttempts = attemptStore;
-
-function getClientKey(req: Request): string {
-  const forwardedFor = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  const realIp = req.headers.get('x-real-ip')?.trim();
-  const candidate = forwardedFor || realIp || 'unknown';
-  return `ip:${candidate}`;
+function identityKey(phoneOrEmail: string): string {
+  return `customer-login:id:${phoneOrEmail.trim().toLowerCase().slice(0, 120)}`;
 }
 
-function isRateLimited(key: string): boolean {
-  const now = Date.now();
-  const current = attemptStore.get(key);
-
-  if (!current) {
-    attemptStore.set(key, { count: 1, firstAttemptAt: now });
-    return false;
-  }
-
-  if (now - current.firstAttemptAt > RATE_LIMIT_WINDOW_MS) {
-    attemptStore.set(key, { count: 1, firstAttemptAt: now });
-    return false;
-  }
-
-  current.count += 1;
-  attemptStore.set(key, current);
-  return current.count > RATE_LIMIT_MAX_ATTEMPTS;
-}
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const key = getClientKey(req);
-    if (isRateLimited(key)) {
-      return NextResponse.json(
-        { success: false, error: 'Demasiados intentos. Intenta de nuevo en unos minutos.' },
-        { status: 429 }
-      );
-    }
+    const ip = getClientIp(req);
+    const ipKey = `customer-login:ip:${ip}`;
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const method = (body.method as LoginMethod) || 'phone';
     const rememberMe = Boolean(body.rememberMe);
     const sessionHours = rememberMe
       ? SESSION_DURATION_DAYS_REMEMBER_ME * 24
       : SESSION_DURATION_HOURS_DEFAULT;
+
+    const identifier =
+      method === 'phone' ? String(body.phone ?? '') : String(body.phoneOrEmail ?? '');
+    const idKey = identifier ? identityKey(identifier) : null;
+
+    // Verifica límite por IP y por identidad intentada
+    for (const key of [ipKey, ...(idKey ? [idKey] : [])]) {
+      const limit = await checkRateLimit(key, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
+      if (limit.isBlocked) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Demasiados intentos. Intenta de nuevo en unos minutos.',
+            retryAfterSeconds: limit.retryAfterSeconds,
+          },
+          { status: 429 }
+        );
+      }
+    }
 
     if (method === 'phone' && !isPhoneOtpLoginEnabled()) {
       return NextResponse.json(
@@ -77,16 +62,15 @@ export async function POST(req: Request) {
 
     const sessionId = req.headers.get('x-session-id');
 
-    if (method === 'phone') {
-      const { phone, otpCode } = body;
-      if (!phone || !otpCode) {
-        return NextResponse.json(
-          { success: false, error: 'Phone y OTP son requeridos' },
-          { status: 400 }
-        );
+    const failWith = async (error: string, status = 401) => {
+      await recordFailedAttempt(ipKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS, LOGIN_LOCKOUT_MS);
+      if (idKey) {
+        await recordFailedAttempt(idKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS, LOGIN_LOCKOUT_MS);
       }
+      return NextResponse.json({ success: false, error }, { status });
+    };
 
-      const result = await loginWithPhone(phone, otpCode, sessionHours);
+    const completeLogin = async (result: { token: string; user: any }) => {
       await setSessionCookie(result.token, sessionHours * 60 * 60);
 
       if (sessionId && result.user?.id) {
@@ -97,10 +81,32 @@ export async function POST(req: Request) {
       }
       await rotateGuestSessionCookie();
 
+      await resetRateLimit(ipKey);
+      if (idKey) await resetRateLimit(idKey);
+
+      // Sanitizado en el borde (src/lib/user-dto.ts): nunca incluye hash de
+      // contraseña, passwordChangedAt ni relaciones internas.
       return NextResponse.json({
         success: true,
-        data: { user: result.user },
+        data: { user: toAuthUserDTO(result.user as Record<string, unknown>) },
       });
+    };
+
+    if (method === 'phone') {
+      const { phone, otpCode } = body;
+      if (!phone || !otpCode) {
+        return NextResponse.json(
+          { success: false, error: 'Phone y OTP son requeridos' },
+          { status: 400 }
+        );
+      }
+
+      try {
+        const result = await loginWithPhone(phone, otpCode, sessionHours);
+        return await completeLogin(result);
+      } catch (error: any) {
+        return await failWith(error?.message || 'Código inválido o expirado');
+      }
     }
 
     const { phoneOrEmail, password } = body;
@@ -111,25 +117,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await loginWithPassword(phoneOrEmail, password, sessionHours);
-    await setSessionCookie(result.token, sessionHours * 60 * 60);
-
-    if (sessionId && result.user?.id) {
-      await Promise.all([
-        transferSessionCartToUser(sessionId, result.user.id),
-        transferSessionOrderToUser(sessionId, result.user.id),
-      ]).catch((e) => console.error('Error transfiriendo sesión al usuario:', e));
+    try {
+      const result = await loginWithPassword(phoneOrEmail, password, sessionHours);
+      return await completeLogin(result);
+    } catch (error: any) {
+      return await failWith(error?.message || 'Credenciales inválidas');
     }
-    await rotateGuestSessionCookie();
-
-    return NextResponse.json({
-      success: true,
-      data: { user: result.user },
-    });
   } catch (error: any) {
+    console.error('Customer login error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'No fue posible iniciar sesión' },
-      { status: 401 }
+      { success: false, error: error?.message || 'No fue posible iniciar sesión' },
+      { status: 500 }
     );
   }
 }

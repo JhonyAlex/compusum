@@ -1,0 +1,196 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { TEST_API_PASSWORD, TEST_BCRYPT_PLACEHOLDER } from '../helpers/credentials';
+
+/**
+ * TESTS DE ENDPOINT (respuesta JSON real) para las rutas de autenticación.
+ *
+ * GARANTÍA P0: NINGUNA respuesta de login/registro/OTP puede contener el hash
+ * `password`, `passwordChangedAt`, tokens de sesión ni relaciones internas.
+ * Los mocks de lib devuelven ADREDEDMENTE un registro Prisma COMPLETO
+ * (con password hash y passwordChangedAt) para probar que el sanitizado del
+ * borde lo elimina de la respuesta.
+ */
+
+const mockDb = vi.hoisted(() => ({
+  user: {
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
+  session: {
+    create: vi.fn(),
+    deleteMany: vi.fn(),
+  },
+  rateLimit: {
+    findUnique: vi.fn().mockResolvedValue(null),
+    upsert: vi.fn().mockResolvedValue({}),
+    deleteMany: vi.fn().mockResolvedValue({}),
+  },
+}));
+
+vi.mock('@/lib/db', () => ({ db: mockDb }));
+
+// Usuario Prisma "crudo" que una capa interna podría devolver por error:
+// contiene hash, marcas de auditoría y una relación interna.
+const RAW_DB_USER = {
+  id: 'user-raw-1',
+  name: 'Cliente Crudo',
+  email: 'crudo@test.com',
+  phone: '573001234567',
+  role: 'CUSTOMER',
+  isActive: true,
+  company: null,
+  taxId: null,
+  city: null,
+  password: TEST_BCRYPT_PLACEHOLDER,
+  passwordChangedAt: new Date('2026-01-01T00:00:00Z'),
+  sessions: [{ token: 'token-interno' }],
+  priceProfileId: null,
+  lastLogin: new Date('2026-02-01T00:00:00Z'),
+};
+
+vi.mock('@/lib/auth', () => ({
+  setSessionCookie: vi.fn().mockResolvedValue(undefined),
+  clearSessionCookie: vi.fn(),
+  rotateGuestSessionCookie: vi.fn().mockResolvedValue('new-guest-session'),
+  createSession: vi.fn().mockResolvedValue('session-token-opaco'),
+  getCurrentUser: vi.fn().mockResolvedValue(null),
+  requireAdminApi: vi.fn().mockResolvedValue({ error: null, user: { id: 'admin-1', role: 'admin' } }),
+  isAdminRole: (role: string | null | undefined) =>
+    ['admin', 'editor', 'agent'].includes(String(role).toLowerCase()),
+  verifyPassword: vi.fn().mockResolvedValue(true),
+  SESSION_DURATION_HOURS_DEFAULT: 24,
+  SESSION_DURATION_DAYS_REMEMBER_ME: 30,
+}));
+
+vi.mock('@/lib/auth-dual', () => ({
+  isPhoneOtpLoginEnabled: vi.fn().mockReturnValue(true),
+  loginWithPhone: vi.fn(),
+  loginWithPassword: vi.fn(),
+}));
+
+vi.mock('@/lib/customer-auth', () => ({
+  registerCustomer: vi.fn(),
+  CustomerAuthError: class CustomerAuthError extends Error {
+    code: string;
+    constructor(code: string, message: string) {
+      super(message);
+      this.code = code;
+    }
+  },
+}));
+
+vi.mock('@/lib/order-cart-upsert', () => ({
+  transferSessionCartToUser: vi.fn().mockResolvedValue(undefined),
+  transferSessionOrderToUser: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { POST as phoneRoutePOST } from '@/app/api/auth/phone/route';
+import { POST as customerLoginPOST } from '@/app/api/auth/customer/login/route';
+import { POST as registerPOST } from '@/app/api/auth/register/route';
+import { loginWithPhone, loginWithPassword } from '@/lib/auth-dual';
+import { registerCustomer } from '@/lib/customer-auth';
+
+const BODY = { phone: '+57 300 123 4567', otpCode: '1234' };
+
+function jsonRequest(url: string, body: unknown): any {
+  return new Request(`http://localhost${url}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-session-id': 'guest-session-1' },
+    body: JSON.stringify(body),
+  });
+}
+
+const FORBIDDEN_KEYS = ['password', 'passwordChangedAt', 'sessions', 'lastLogin', 'token', 'priceProfileId'];
+const FORBIDDEN_VALUES = [TEST_BCRYPT_PLACEHOLDER, 'token-interno'];
+
+function expectSafeUserPayload(payload: any) {
+  const json = JSON.stringify(payload);
+  for (const key of FORBIDDEN_KEYS) {
+    expect(json).not.toContain(`"${key}"`);
+  }
+  for (const value of FORBIDDEN_VALUES) {
+    expect(json).not.toContain(value);
+  }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockDb.rateLimit.findUnique.mockResolvedValue(null);
+  mockDb.rateLimit.upsert.mockResolvedValue({});
+  mockDb.rateLimit.deleteMany.mockResolvedValue({});
+});
+
+describe('ENDPOINT /api/auth/phone (OTP, usado por LoginModal legacy)', () => {
+  it('devuelve el usuario SIN password/passwordChangedAt/relaciones internas', async () => {
+    (loginWithPhone as any).mockResolvedValue({ token: 'tok', user: RAW_DB_USER });
+
+    const res = await phoneRoutePOST(jsonRequest('/api/auth/phone', BODY));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.data.user).toMatchObject({ id: RAW_DB_USER.id, role: 'CUSTOMER' });
+    expectSafeUserPayload(json);
+  });
+
+  it('la cookie de sesión NUNCA aparece en el body de la respuesta', async () => {
+    (loginWithPhone as any).mockResolvedValue({ token: 'tok-secreto', user: RAW_DB_USER });
+
+    const res = await phoneRoutePOST(jsonRequest('/api/auth/phone', BODY));
+    const json = await res.json();
+
+    expect(JSON.stringify(json)).not.toContain('tok-secreto');
+  });
+});
+
+describe('ENDPOINT /api/auth/customer/login', () => {
+  it('login password => usuario sanitizado (sin hash ni datos internos)', async () => {
+    (loginWithPassword as any).mockResolvedValue({ token: 'tok', user: RAW_DB_USER });
+
+    const res = await customerLoginPOST(
+      jsonRequest('/api/auth/customer/login', {
+        method: 'password',
+        phoneOrEmail: '3001234567',
+        password: TEST_API_PASSWORD,
+      })
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data.user.id).toBe(RAW_DB_USER.id);
+    expectSafeUserPayload(json);
+  });
+
+  it('login OTP => usuario sanitizado', async () => {
+    (loginWithPhone as any).mockResolvedValue({ token: 'tok', user: RAW_DB_USER });
+
+    const res = await customerLoginPOST(
+      jsonRequest('/api/auth/customer/login', { method: 'phone', phone: '3001234567', otpCode: '1234' })
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expectSafeUserPayload(json);
+  });
+});
+
+describe('ENDPOINT /api/auth/register', () => {
+  it('registro => usuario sanitizado', async () => {
+    (registerCustomer as any).mockResolvedValue({ token: 'tok', user: RAW_DB_USER });
+
+    const res = await registerPOST(
+      jsonRequest('/api/auth/register', {
+        name: 'Cliente Crudo',
+        phone: '3001234567',
+        password: TEST_API_PASSWORD,
+      })
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data.user.id).toBe(RAW_DB_USER.id);
+    expectSafeUserPayload(json);
+  });
+});

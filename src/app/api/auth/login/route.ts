@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { verifyPassword, createSession, setSessionCookie } from '@/lib/auth';
+import { verifyPassword, createSession, setSessionCookie, rotateGuestSessionCookie, isAdminRole } from '@/lib/auth';
 import { transferSessionCartToUser, transferSessionOrderToUser } from '@/lib/order-cart-upsert';
 import {
   getClientIp,
@@ -83,14 +83,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verificar si el usuario está activo
-    if (!user.isActive) {
+    // Verificar si el usuario está activo y es personal interno: este endpoint
+    // es SOLO para administración (los clientes usan /api/auth/customer/login).
+    // Mismo mensaje para ambos casos (no revelar si la cuenta existe).
+    if (!user.isActive || !isAdminRole(user.role)) {
       await Promise.all([
         recordFailedAttempt(ipKey),
         recordFailedAttempt(emailKey),
       ]);
       return NextResponse.json(
-        { success: false, error: 'Usuario desactivado' },
+        { success: false, error: 'Credenciales inválidas' },
         { status: 401 }
       );
     }

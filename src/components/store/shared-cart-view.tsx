@@ -23,10 +23,17 @@ import { resolveProductImageSrc, resolveProductName, resolveProductSlug } from "
 import { isItemInCatalogMode } from "@/hooks/use-catalog-mode";
 import { toast } from "sonner";
 
+interface ResolvedPriceView {
+  unitPrice: number | null;
+  purchasable?: boolean;
+  requiresQuote?: boolean;
+}
+
 interface SharedCartItem {
   id: string;
   quantity: number;
   unitPrice: number | null;
+  resolvedPrice?: ResolvedPriceView | null;
   product: {
     id: string;
     name: string;
@@ -79,9 +86,20 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
 
   const hasCatalogItems = catalogMode || cart.items.some((item) => isItemInCatalogMode(item.product, catalogMode));
 
+  // Precio autorizado para el VISOR actual (resuelto server-side por sesión).
+  // Nunca usamos el snapshot del dueño cuando hay precio resuelto para el visor.
+  const viewerItemPrice = (item: SharedCartItem): number | null => {
+    if (item.resolvedPrice) {
+      return item.resolvedPrice.requiresQuote || item.resolvedPrice.unitPrice == null
+        ? null
+        : item.resolvedPrice.unitPrice;
+    }
+    return item.unitPrice || item.product.wholesalePrice || item.product.price || null;
+  };
+
   const subtotal = cart.items.reduce((sum, item) => {
-    const price = item.unitPrice || item.product.wholesalePrice || item.product.price || 0;
-    return sum + price * item.quantity;
+    const price = viewerItemPrice(item);
+    return sum + (price ?? 0) * item.quantity;
   }, 0);
 
   const handleCopyLink = async () => {
@@ -107,7 +125,7 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
     if (cart.city) msg += `*Ciudad:* ${cart.city.name}, ${cart.city.department}\n`;
     msg += "\n*Productos:*\n";
     cart.items.forEach((item, i) => {
-      const price = item.unitPrice || item.product.wholesalePrice || item.product.price || 0;
+      const price = viewerItemPrice(item);
       const ref = item.product.sku ? ` (Ref: ${item.product.sku})` : "";
       const variant = item.product.variantName
         ? ` [Variacion: ${item.product.variantName}]`
@@ -191,7 +209,7 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
         </CardHeader>
         <CardContent className="p-0">
           {cart.items.map((item) => {
-            const price = item.unitPrice || item.product.wholesalePrice || item.product.price || 0;
+            const price = viewerItemPrice(item);
             const productName = resolveProductName(item.product.name);
             const productSlug = resolveProductSlug(item.product.slug);
             const itemCatalogMode = isItemInCatalogMode(item.product, catalogMode);
@@ -221,8 +239,8 @@ export function SharedCartView({ cart, catalogMode = false }: SharedCartViewProp
                   )}
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-xs text-slate-500">x{item.quantity}</span>
-                    {itemCatalogMode ? (
-                      <span className="text-xs font-medium text-slate-500">Precio en cotización</span>
+                    {itemCatalogMode || price == null ? (
+                      <span className="text-xs font-medium text-slate-500">Consultar precio</span>
                     ) : (
                       <span className="text-sm font-semibold text-blue-600">
                         {formatPrice(price * item.quantity)}

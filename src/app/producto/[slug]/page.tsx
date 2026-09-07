@@ -20,6 +20,8 @@ import { ProductDetailCTA } from "@/components/store/product-detail-cta";
 import { formatPrice } from "@/lib/format";
 import { resolveCatalogMode } from "@/lib/catalog-mode";
 import { getCachedProductBySlug, getCachedGlobalCatalogMode } from "@/lib/product-cache";
+import { attachResolvedPrices } from "@/lib/pricing";
+import { getSessionPricingContext } from "@/lib/pricing-context";
 import { ViewCountTracker } from "@/components/store/view-count-tracker";
 import {
   resolveBrandLogoSrc,
@@ -139,6 +141,31 @@ export default async function ProductDetailPage({ params }: PageProps) {
   } catch (error) {
     console.error("Related products query failed", error);
   }
+
+  // Motor único de precios: resolvedPrice del producto, sus variantes y
+  // relacionados, según la sesión (batch, sin N+1).
+  // IMPORTANTE: capturar `resolvedPrice` DESPUÉS de attachResolvedPrices —
+  // antes de este fix se leía el valor base previo y la cabecera ignoraba el
+  // precio resuelto del perfil del cliente.
+  let pricedProduct = product;
+  let pricedRelated = relatedProducts;
+  try {
+    const pricingCtx = await getSessionPricingContext();
+    const [attachedProduct, attachedRelated] = await Promise.all([
+      attachResolvedPrices([product], pricingCtx),
+      attachResolvedPrices(
+        relatedProducts.map((p) => ({ ...p, variantCount: p._count.variants })),
+        pricingCtx
+      ),
+    ]);
+    pricedProduct = attachedProduct[0] ?? product;
+    pricedRelated = attachedRelated;
+  } catch (error) {
+    console.error("Price resolution failed", error);
+  }
+  product = pricedProduct;
+
+  const resolvedPrice = (product as any).resolvedPrice ?? null;
 
   const stockStatusColors = {
     disponible: "bg-green-500",
@@ -288,6 +315,33 @@ export default async function ProductDetailPage({ params }: PageProps) {
                         Solicita tu cotización personalizada
                       </p>
                     </div>
+                  ) : resolvedPrice && (resolvedPrice.requiresQuote || resolvedPrice.unitPrice !== null) ? (
+                    resolvedPrice.requiresQuote ? (
+                      <div>
+                        <p className="text-lg font-semibold text-primary">
+                          Precio a consultar
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Solicita tu cotización personalizada
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-baseline gap-3">
+                          <p className="text-3xl font-bold text-primary">
+                            {formatPrice(resolvedPrice.unitPrice!)}
+                          </p>
+                          <Badge className="bg-accent text-white">
+                            Tu precio
+                          </Badge>
+                        </div>
+                        {product.minWholesaleQty && (
+                          <p className="text-sm text-gray-500 mt-2">
+                            Válido desde {product.minWholesaleQty} unidades
+                          </p>
+                        )}
+                      </>
+                    )
                   ) : (
                     <>
                       {product.price && (
@@ -330,6 +384,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     sku: product.sku,
                     price: product.price,
                     wholesalePrice: product.wholesalePrice,
+                    // Precio resuelto del PRODUCTO (sin variante): el CTA lo
+                    // usa para mostrar y para agregar al carrito.
+                    resolvedPrice: (product as any).resolvedPrice ?? null,
                     minWholesaleQty: product.minWholesaleQty,
                     stockStatus: product.stockStatus,
                     brand: product.brand ? { name: product.brand.name, slug: product.brand.slug } : null,
@@ -342,6 +399,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                         price: variant.price,
                         wholesalePrice: variant.wholesalePrice,
                         stockStatus: variant.stockStatus,
+                        resolvedPrice: (variant as any).resolvedPrice ?? null,
                       })) ?? [],
                   }}
                   catalogMode={productCatalogMode}
@@ -424,17 +482,17 @@ export default async function ProductDetailPage({ params }: PageProps) {
         </section>
 
         {/* Related Products */}
-        {relatedProducts.length > 0 && (
+        {pricedRelated.length > 0 && (
           <section className="py-12 bg-secondary">
             <div className="container mx-auto px-4">
               <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-8">
                 También te puede interesar
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                {relatedProducts.map((p) => (
+                {pricedRelated.map((p) => (
                   <ProductCard
                     key={p.id}
-                    product={{ ...p, variantCount: p._count.variants }}
+                    product={p}
                     globalCatalogMode={globalCatalogMode}
                   />
                 ))}

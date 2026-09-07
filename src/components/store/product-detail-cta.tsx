@@ -7,6 +7,12 @@ import { AddToCartButton } from "@/components/store/add-to-cart-button";
 import type { CartProduct } from "@/stores/cart-store";
 import { formatPrice } from "@/lib/format";
 
+interface ResolvedPriceView {
+  unitPrice: number | null;
+  purchasable?: boolean;
+  requiresQuote?: boolean;
+}
+
 interface ProductVariantOption {
   id: string;
   name: string;
@@ -14,10 +20,14 @@ interface ProductVariantOption {
   price?: number | null;
   wholesalePrice?: number | null;
   stockStatus?: string;
+  resolvedPrice?: ResolvedPriceView | null;
 }
 
 interface ProductDetailCTAProps {
-  product: CartProduct & { variants?: ProductVariantOption[] };
+  product: CartProduct & {
+    resolvedPrice?: ResolvedPriceView | null;
+    variants?: ProductVariantOption[];
+  };
   catalogMode?: boolean;
 }
 
@@ -37,16 +47,36 @@ export function ProductDetailCTA({ product, catalogMode = false }: ProductDetail
 
   const cartProduct = useMemo<CartProduct>(() => {
     if (!selectedVariant) {
-      return product;
+      // Sin variante: espejar el precio resuelto server-side del PRODUCTO en
+      // el CartProduct (el servidor SIEMPRE recalcula al guardar/checkout).
+      const productResolved = product.resolvedPrice;
+      const resolvedUnitPrice =
+        productResolved && !productResolved.requiresQuote && productResolved.unitPrice != null
+          ? productResolved.unitPrice
+          : null;
+
+      return {
+        ...product,
+        price: resolvedUnitPrice ?? product.price,
+        wholesalePrice: resolvedUnitPrice ?? product.wholesalePrice,
+      };
     }
+
+    // Espejo del precio resuelto server-side de la variante seleccionada en
+    // el CartProduct. El servidor SIEMPRE recalcula al guardar/checkout.
+    const variantResolved = selectedVariant.resolvedPrice;
+    const resolvedUnitPrice =
+      variantResolved && !variantResolved.requiresQuote && variantResolved.unitPrice != null
+        ? variantResolved.unitPrice
+        : null;
 
     return {
       ...product,
       variantId: selectedVariant.id,
       variantName: selectedVariant.name,
       variantCode: selectedVariant.code ?? null,
-      price: selectedVariant.price ?? product.price,
-      wholesalePrice: selectedVariant.wholesalePrice ?? product.wholesalePrice,
+      price: resolvedUnitPrice ?? selectedVariant.price ?? product.price,
+      wholesalePrice: resolvedUnitPrice ?? selectedVariant.wholesalePrice ?? product.wholesalePrice,
       stockStatus: selectedVariant.stockStatus || product.stockStatus,
     };
   }, [product, selectedVariant]);
@@ -58,12 +88,17 @@ export function ProductDetailCTA({ product, catalogMode = false }: ProductDetail
   const whatsappMessage = `Hola, quiero cotizar: ${product.name}${product.sku ? ` (Ref: ${product.sku})` : ""}${variantMessage}`;
   const whatsappUrl = `https://wa.me/576063335206?text=${encodeURIComponent(whatsappMessage)}`;
 
-  const variantDisplayPrice =
-    selectedVariant?.wholesalePrice ??
-    selectedVariant?.price ??
-    product.wholesalePrice ??
-    product.price ??
-    null;
+  // Precio resuelto server-side (motor único): variante seleccionada o producto
+  const variantResolvedPrice = selectedVariant?.resolvedPrice;
+  const variantDisplayPrice: number | null = variantResolvedPrice
+    ? variantResolvedPrice.requiresQuote || variantResolvedPrice.unitPrice == null
+      ? null
+      : variantResolvedPrice.unitPrice
+    : selectedVariant?.wholesalePrice ??
+      selectedVariant?.price ??
+      product.wholesalePrice ??
+      product.price ??
+      null;
 
   return (
     <div className="space-y-4">

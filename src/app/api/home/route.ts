@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCachedFeaturedProducts, getCachedNewProducts, getCachedCategories, getCachedBrands, getCachedGlobalCatalogMode } from '@/lib/product-cache';
 import { sanitizeProductsForCatalog } from '@/lib/catalog-mode';
+import { attachResolvedPrices } from '@/lib/pricing';
+import { getSessionPricingContext } from '@/lib/pricing-context';
 
 // Helper function to build category tree
 function buildCategoryTree(categories: any[], parentId: string | null = null): any[] {
@@ -165,7 +167,15 @@ export async function GET() {
     });
 
     // Transform active season with products
-    let seasonData = null;
+    let seasonData: {
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      image: string | null;
+      colorHex: string | null;
+      products: any[];
+    } | null = null;
     if (activeSeason) {
       const seasonProducts = activeSeason.products
         .slice(0, 4)
@@ -181,12 +191,31 @@ export async function GET() {
       };
     }
 
+    // Motor único de precios: resolvedPrice por sesión (batch, sin N+1)
+    const pricingCtx = await getSessionPricingContext();
+    const [pricedFeatured, pricedNew, pricedSeason] = await Promise.all([
+      attachResolvedPrices(
+        sanitizeProductsForCatalog(featuredProducts, isCatalogMode),
+        pricingCtx
+      ),
+      attachResolvedPrices(
+        sanitizeProductsForCatalog(newProducts, isCatalogMode),
+        pricingCtx
+      ),
+      seasonData
+        ? attachResolvedPrices(seasonData.products, pricingCtx)
+        : Promise.resolve([]),
+    ]);
+    if (seasonData) {
+      seasonData.products = pricedSeason;
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         banners: activeBanners,
-        featuredProducts: sanitizeProductsForCatalog(featuredProducts, isCatalogMode),
-        newProducts: sanitizeProductsForCatalog(newProducts, isCatalogMode),
+        featuredProducts: pricedFeatured,
+        newProducts: pricedNew,
         categories: categoryTree,
         brands: brandsWithCount.slice(0, 8),
         activeSeason: seasonData,

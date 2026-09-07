@@ -2,30 +2,13 @@ import { db } from './db';
 import { hashPassword, verifyPassword, createSession } from './auth';
 import { DEFAULT_MOCK_PHONE_OTP, PHONE_OTP_LENGTH } from './phone-otp';
 import { checkOtpWithTwilio, isTwilioVerifyConfigured, sendOtpWithTwilio } from './twilio-verify';
+import { canonicalColombiaPhone, phoneOrVariants, toE164ColombiaPhone } from './phone';
+import { requireAuthUserDTO, AuthUserDTO } from './user-dto';
 
 function generateTemporaryPassword(): string {
   const bytes = new Uint8Array(16);
   globalThis.crypto.getRandomValues(bytes);
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function normalizePhoneInput(phone: string): string {
-  return phone.replace(/\D/g, '');
-}
-
-function toE164Phone(phone: string): string {
-  const digits = normalizePhoneInput(phone);
-
-  if (phone.trim().startsWith('+')) {
-    return `+${digits}`;
-  }
-
-  // Default Colombia country code for local 10-digit input.
-  if (digits.length === 10) {
-    return `+57${digits}`;
-  }
-
-  return `+${digits}`;
 }
 
 function isMockOtpEnabled(): boolean {
@@ -37,7 +20,13 @@ export function isPhoneOtpLoginEnabled(): boolean {
 }
 
 export async function sendPhoneOtp(phone: string): Promise<{ provider: 'twilio' | 'mock'; debugCode?: string }> {
-  const e164Phone = toE164Phone(phone);
+  // Twilio Verify recibe E.164 (+57...); la canonicalización interna es la
+  // misma para cualquier formato de entrada del usuario.
+  const e164Phone = toE164ColombiaPhone(phone);
+
+  if (!e164Phone) {
+    throw new Error('Número de teléfono colombiano inválido. Usa 10 dígitos, ej: 3001234567.');
+  }
 
   if (isMockOtpEnabled()) {
     return {
@@ -54,13 +43,16 @@ export async function sendPhoneOtp(phone: string): Promise<{ provider: 'twilio' 
   return { provider: 'twilio' };
 }
 
-export async function loginWithPhone(
-  phone: string,
-  otpCode: string,
-  sessionDurationHours = 24
-): Promise<{ token: string; user: any }> {
-  const e164Phone = toE164Phone(phone);
-  const normalizedPhone = normalizePhoneInput(e164Phone);
+/**
+ * Verifica un código OTP para un teléfono. Reutilizada por login y por el
+ * restablecimiento de contraseña (la expiración la gestiona el proveedor).
+ */
+export async function verifyPhoneOtp(phone: string, otpCode: string): Promise<void> {
+  const e164Phone = toE164ColombiaPhone(phone);
+  if (!e164Phone) {
+    throw new Error('Número de teléfono colombiano inválido');
+  }
+
   const normalizedOtpCode = otpCode.replace(/\D/g, '');
 
   if (normalizedOtpCode.length !== PHONE_OTP_LENGTH) {
@@ -79,44 +71,96 @@ export async function loginWithPhone(
     const isValidTwilioOtp = await checkOtpWithTwilio(e164Phone, normalizedOtpCode);
     if (!isValidTwilioOtp) throw new Error('Código inválido o expirado');
   }
+}
 
-  let user = await db.user.findUnique({ where: { phone: normalizedPhone } });
+/**
+ * Busca la cuenta CUSTOMER asociada a un teléfono en CUALQUIERA de las formas
+ * almacenadas (canónico `57...` o legado local de 10 dígitos). Determinista:
+ * siempre resuelve la misma cuenta para `3001234567`, `+573001234567` y
+ * `573001234567`.
+ */
+export async function findCustomerByPhone(phone: string, tx: any = db) {
+  const variants = phoneOrVariants(phone);
+  if (variants.length === 0) return null;
+
+  return (tx ?? db).user.findFirst({
+    where: {
+      role: { equals: 'CUSTOMER', mode: 'insensitive' },
+      OR: variants,
+    },
+  });
+}
+
+export async function loginWithPhone(
+  phone: string,
+  otpCode: string,
+  sessionDurationHours = 24
+): Promise<{ token: string; user: AuthUserDTO }> {
+  const canonicalPhone = canonicalColombiaPhone(phone);
+
+  await verifyPhoneOtp(phone, otpCode);
+
+  let user = canonicalPhone ? await findCustomerByPhone(canonicalPhone) : null;
+
+  if (user && !user.isActive) {
+    throw new Error('Tu cuenta está desactivada. Contacta a tu asesor comercial.');
+  }
 
   if (!user) {
+    if (!canonicalPhone) {
+      throw new Error('Número de teléfono colombiano inválido. Usa 10 dígitos, ej: 3001234567.');
+    }
+    // Alta por OTP: SIEMPRE formato canónico y rol CUSTOMER explícito.
     user = await db.user.create({
       data: {
-        phone: normalizedPhone,
+        phone: canonicalPhone,
         name: 'Nuevo Cliente',
+        role: 'CUSTOMER',
         password: await hashPassword(generateTemporaryPassword()),
       }
     });
   }
 
   const token = await createSession(user.id, sessionDurationHours);
-  return { token, user };
+  return { token, user: requireAuthUserDTO(user) };
 }
 
+/**
+ * Login de CLIENTE con contraseña. SOLO autentica cuentas role=CUSTOMER:
+ * el personal interno (admin/editor/AGENT) tiene su propio acceso.
+ */
 export async function loginWithPassword(
   phoneOrEmail: string,
   passwordPlain: string,
   sessionDurationHours = 24
-): Promise<{ token: string; user: any }> {
+): Promise<{ token: string; user: AuthUserDTO }> {
+  const identifier = phoneOrEmail?.trim().toLowerCase();
+  if (!identifier || !passwordPlain) {
+    throw new Error('Credenciales inválidas');
+  }
+
   const user = await db.user.findFirst({
     where: {
+      role: { equals: 'CUSTOMER', mode: 'insensitive' },
       OR: [
-        { phone: phoneOrEmail },
-        { email: phoneOrEmail }
-      ]
-    }
+        // Teléfono: aceptar cualquier forma equivalente de la misma línea
+        ...phoneOrVariants(identifier),
+        { email: identifier },
+      ],
+    },
   });
 
   if (!user || !user.password) {
     throw new Error("Usa tu número de teléfono para ingresar o configura una contraseña.");
   }
 
+  if (!user.isActive) {
+    throw new Error("Tu cuenta está desactivada. Contacta a tu asesor comercial.");
+  }
+
   const isValid = await verifyPassword(passwordPlain, user.password);
   if (!isValid) throw new Error("Credenciales inválidas");
 
   const token = await createSession(user.id, sessionDurationHours);
-  return { token, user };
+  return { token, user: requireAuthUserDTO(user) };
 }

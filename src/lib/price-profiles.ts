@@ -1,0 +1,371 @@
+import { db } from "./db";
+import { Prisma } from "@prisma/client";
+
+/**
+ * Administración de perfiles de precio (listas comerciales).
+ * El precio base Siesa (Product/ProductVariant) nunca es tocado: los perfiles
+ * viven en PriceProfile + overrides separados y NO son destruidos por la
+ * sincronización Siesa.
+ */
+
+export class PriceProfileAdminError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "PriceProfileAdminError";
+    this.code = code;
+  }
+}
+
+/**
+ * La migración crea un índice único parcial (UNA sola fila isDefault=true).
+ * Por eso el orden de escritura es OBLIGATORIO: DESMARCAR el default vigente
+ * ANTES de crear/promover el nuevo. Si dos operaciones concurrentes chocan,
+ * el índice rechaza la segunda escritura (P2002) => error controlado y nunca
+ * dos defaults.
+ */
+function demoteCurrentDefault(tx: any, exceptProfileId?: string): Promise<unknown> {
+  return tx.priceProfile.updateMany({
+    where: {
+      isDefault: true,
+      ...(exceptProfileId ? { id: { not: exceptProfileId } } : {}),
+    },
+    data: { isDefault: false },
+  });
+}
+
+/**
+ * Traduce una violación de unicidad concurrente (P2002) a un error controlado.
+ * El índice parcial sobre ("isDefault") WHERE "isDefault" es la defensa
+ * definitiva: a lo sumo UN default aunque dos requests corran en paralelo.
+ */
+function rethrowUniqueViolation(error: unknown): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    const target = JSON.stringify(error.meta?.target ?? "");
+    if (target.includes("code")) {
+      throw new PriceProfileAdminError("CODE_EXISTS", "Ya existe un perfil con ese código.");
+    }
+    throw new PriceProfileAdminError(
+      "DEFAULT_CONFLICT",
+      "Otro perfil acaba de marcarse como predeterminado. Recarga e inténtalo de nuevo."
+    );
+  }
+  throw error as Error;
+}
+
+export interface ProfileOverrideInput {
+  productId?: string;
+  variantId?: string;
+  wholesalePrice?: number | null;
+  price?: number | null;
+}
+
+export interface PriceProfileInput {
+  name?: string;
+  code?: string;
+  description?: string | null;
+  percentAdjustment?: number | null;
+  isActive?: boolean;
+  isDefault?: boolean;
+  productOverrides?: ProfileOverrideInput[];
+  variantOverrides?: ProfileOverrideInput[];
+}
+
+function validatePriceValue(value: number | null | undefined, label: string): number | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "number" || isNaN(value) || value < 0) {
+    throw new PriceProfileAdminError(
+      "INVALID_PRICE",
+      `${label}: el precio debe ser un número mayor o igual a 0 (0 = requiere cotización).`
+    );
+  }
+  return value;
+}
+
+function validateOverrides(input: PriceProfileInput): void {
+  const products = input.productOverrides ?? [];
+  const variants = input.variantOverrides ?? [];
+
+  const seenProducts = new Set<string>();
+  for (const o of products) {
+    if (!o.productId) {
+      throw new PriceProfileAdminError("INVALID_OVERRIDE", "Cada override de producto requiere productId.");
+    }
+    if (seenProducts.has(o.productId)) {
+      throw new PriceProfileAdminError("INVALID_OVERRIDE", "Override de producto duplicado.");
+    }
+    seenProducts.add(o.productId);
+    const wp = validatePriceValue(o.wholesalePrice, "Override de producto");
+    const p = validatePriceValue(o.price, "Override de producto");
+    if (wp === null && p === null) {
+      throw new PriceProfileAdminError(
+        "INVALID_OVERRIDE",
+        "Cada override de producto requiere wholesalePrice o price."
+      );
+    }
+  }
+
+  const seenVariants = new Set<string>();
+  for (const o of variants) {
+    if (!o.variantId) {
+      throw new PriceProfileAdminError("INVALID_OVERRIDE", "Cada override de variante requiere variantId.");
+    }
+    if (seenVariants.has(o.variantId)) {
+      throw new PriceProfileAdminError("INVALID_OVERRIDE", "Override de variante duplicado.");
+    }
+    seenVariants.add(o.variantId);
+    const wp = validatePriceValue(o.wholesalePrice, "Override de variante");
+    const p = validatePriceValue(o.price, "Override de variante");
+    if (wp === null && p === null) {
+      throw new PriceProfileAdminError(
+        "INVALID_OVERRIDE",
+        "Cada override de variante requiere wholesalePrice o price."
+      );
+    }
+  }
+}
+
+function normalizePercent(value: number | null | undefined): number | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "number" || isNaN(value) || value < -99 || value > 1000) {
+    throw new PriceProfileAdminError(
+      "INVALID_PERCENT",
+      "El ajuste porcentual debe estar entre -99 y 1000."
+    );
+  }
+  return value;
+}
+
+/**
+ * Valida que TODOS los productos/variantes referenciados por los overrides
+ * existan, ANTES de escribir nada. Un id inválido debe abortar la operación
+ * completa sin efectos parciales.
+ */
+async function validateOverrideReferences(input: PriceProfileInput, tx: any): Promise<void> {
+  const productIds = Array.from(
+    new Set((input.productOverrides ?? []).map((o) => o.productId!).filter(Boolean))
+  );
+  const variantIds = Array.from(
+    new Set((input.variantOverrides ?? []).map((o) => o.variantId!).filter(Boolean))
+  );
+
+  if (productIds.length > 0) {
+    const found = await tx.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((p: any) => p.id));
+    const missing = productIds.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+      throw new PriceProfileAdminError(
+        "INVALID_OVERRIDE",
+        `Producto(s) inexistente(s): ${missing.join(", ")}.`
+      );
+    }
+  }
+
+  if (variantIds.length > 0) {
+    const found = await tx.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((v: any) => v.id));
+    const missing = variantIds.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+      throw new PriceProfileAdminError(
+        "INVALID_OVERRIDE",
+        `Variante(s) inexistente(s): ${missing.join(", ")}.`
+      );
+    }
+  }
+}
+
+/**
+ * Crea el perfil COMPLETO (perfil + exclusividad de default + overrides)
+ * dentro de UNA transacción. Un id de producto/variante inválido, un código
+ * duplicado o cualquier fallo intermedio aborta TODO (nada queda a medias).
+ */
+export async function createPriceProfile(input: PriceProfileInput) {
+  const name = input.name?.trim().slice(0, 120);
+  const code = input.code?.trim().toUpperCase().slice(0, 60);
+
+  if (!name || !code) {
+    throw new PriceProfileAdminError("INVALID_INPUT", "Nombre y código son requeridos.");
+  }
+  validateOverrides(input);
+  normalizePercent(input.percentAdjustment);
+
+  return db.$transaction(async (tx: any) => {
+    const existing = await tx.priceProfile.findUnique({ where: { code }, select: { id: true } });
+    if (existing) {
+      throw new PriceProfileAdminError("CODE_EXISTS", "Ya existe un perfil con ese código.");
+    }
+
+    await validateOverrideReferences(input, tx);
+
+    // Con el índice único parcial vigente, marcar default exige desmarcar el
+    // anterior PRIMERO: crear directamente con isDefault=true sería rechazado
+    // por PostgreSQL si ya existiera otro default.
+    if (input.isDefault) {
+      await demoteCurrentDefault(tx);
+    }
+
+    let profile;
+    try {
+      profile = await tx.priceProfile.create({
+        data: {
+          name,
+          code,
+          description: input.description?.trim().slice(0, 500) || null,
+          percentAdjustment: normalizePercent(input.percentAdjustment),
+          isActive: input.isActive ?? true,
+          isDefault: input.isDefault ?? false,
+        },
+      });
+    } catch (error) {
+      rethrowUniqueViolation(error);
+    }
+
+    await replaceOverrides(profile.id, input, tx);
+    return getPriceProfile(profile.id, tx);
+  });
+}
+
+/**
+ * Actualiza el perfil COMPLETO (datos + exclusividad de default + overrides)
+ * dentro de UNA transacción. Un override inválido deja el perfil y sus
+ * overrides anteriores EXACTAMENTE como estaban.
+ */
+export async function updatePriceProfile(id: string, input: PriceProfileInput) {
+  return db.$transaction(async (tx: any) => {
+    const current = await tx.priceProfile.findUnique({ where: { id } });
+    if (!current) {
+      throw new PriceProfileAdminError("NOT_FOUND", "Perfil de precio no encontrado.");
+    }
+
+    const data: Record<string, unknown> = {};
+    if (input.name !== undefined) {
+      const name = input.name?.trim().slice(0, 120);
+      if (!name) throw new PriceProfileAdminError("INVALID_INPUT", "El nombre es requerido.");
+      data.name = name;
+    }
+    if (input.code !== undefined) {
+      const code = input.code?.trim().toUpperCase().slice(0, 60);
+      if (!code) throw new PriceProfileAdminError("INVALID_INPUT", "El código es requerido.");
+      const existing = await tx.priceProfile.findUnique({ where: { code }, select: { id: true } });
+      if (existing && existing.id !== id) {
+        throw new PriceProfileAdminError("CODE_EXISTS", "Ya existe un perfil con ese código.");
+      }
+      data.code = code;
+    }
+    if (input.description !== undefined) {
+      data.description = input.description?.trim().slice(0, 500) || null;
+    }
+    if (input.percentAdjustment !== undefined) {
+      data.percentAdjustment = normalizePercent(input.percentAdjustment);
+    }
+    if (input.isActive !== undefined) {
+      data.isActive = input.isActive;
+    }
+    if (input.isDefault !== undefined) {
+      data.isDefault = input.isDefault;
+    }
+
+    validateOverrides(input);
+    await validateOverrideReferences(input, tx);
+
+    // Promoción a default: desmarcar el default vigente ANTES del update;
+    // el update directo con isDefault=true chocaría con el índice único
+    // parcial si otro perfil ya es default.
+    if (input.isDefault) {
+      await demoteCurrentDefault(tx, id);
+    }
+
+    try {
+      await tx.priceProfile.update({ where: { id }, data });
+    } catch (error) {
+      rethrowUniqueViolation(error);
+    }
+
+    if (input.productOverrides !== undefined || input.variantOverrides !== undefined) {
+      await replaceOverrides(id, input, tx);
+    }
+
+    return getPriceProfile(id, tx);
+  });
+}
+
+/** Reemplaza el set completo de overrides del perfil (delete + create). */
+async function replaceOverrides(profileId: string, input: PriceProfileInput, tx: any) {
+  if (input.productOverrides !== undefined) {
+    const rows = input.productOverrides.map((o) => ({
+      profileId,
+      productId: o.productId!,
+      wholesalePrice: validatePriceValue(o.wholesalePrice, "Override de producto"),
+      price: validatePriceValue(o.price, "Override de producto"),
+    }));
+    await tx.priceProfileProduct.deleteMany({ where: { profileId } });
+    if (rows.length > 0) {
+      await tx.priceProfileProduct.createMany({ data: rows });
+    }
+  }
+
+  if (input.variantOverrides !== undefined) {
+    const rows = input.variantOverrides.map((o) => ({
+      profileId,
+      variantId: o.variantId!,
+      wholesalePrice: validatePriceValue(o.wholesalePrice, "Override de variante"),
+      price: validatePriceValue(o.price, "Override de variante"),
+    }));
+    await tx.priceProfileVariant.deleteMany({ where: { profileId } });
+    if (rows.length > 0) {
+      await tx.priceProfileVariant.createMany({ data: rows });
+    }
+  }
+}
+
+export async function getPriceProfile(id: string, tx: any = db) {
+  const profile = await tx.priceProfile.findUnique({
+    where: { id },
+    include: {
+      productOverrides: {
+        select: {
+          id: true,
+          productId: true,
+          wholesalePrice: true,
+          price: true,
+          product: { select: { name: true, sku: true } },
+        },
+        orderBy: { id: "asc" },
+      },
+      variantOverrides: {
+        select: {
+          id: true,
+          variantId: true,
+          wholesalePrice: true,
+          price: true,
+          variant: {
+            select: { name: true, code: true, product: { select: { name: true, sku: true } } },
+          },
+        },
+        orderBy: { id: "asc" },
+      },
+      _count: { select: { users: true } },
+    },
+  });
+  return profile;
+}
+
+export async function deletePriceProfile(id: string, tx: any = db) {
+  const current = await tx.priceProfile.findUnique({
+    where: { id },
+    include: { _count: { select: { users: true } } },
+  });
+  if (!current) {
+    throw new PriceProfileAdminError("NOT_FOUND", "Perfil de precio no encontrado.");
+  }
+
+  // Los usuarios quedan sin perfil (FK onDelete SetNull): vuelven al precio base.
+  await tx.priceProfile.delete({ where: { id } });
+  return { assignedUsers: current._count.users };
+}

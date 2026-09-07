@@ -2,8 +2,10 @@ import { db } from './db';
 import { hashPassword } from './auth';
 import { Prisma } from '@prisma/client';
 import { validateAndPriceItems } from './cart-validation';
+import { resolveServerPricingCustomer } from './pricing';
 import { generateOrderNumber, createOrderTransactionWithRetry } from './order-number';
 import { getNextRouteDeparture } from './route-schedule';
+import { canonicalColombiaPhone, phoneOrVariants } from './phone';
 
 function generateTemporaryPassword(): string {
   const bytes = new Uint8Array(16);
@@ -11,10 +13,13 @@ function generateTemporaryPassword(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * Teléfono canónico (`src/lib/phone.ts`): `3001234567`, `+573001234567` y
+ * `573001234567` producen SIEMPRE `573001234567`. Mantiene el nombre público
+ * usado por el flujo de pedidos.
+ */
 export function normalizePhone(phone?: string | null): string | null {
-  if (!phone) return null;
-  const digitsOnly = phone.replace(/\D/g, '');
-  return digitsOnly.length >= 7 ? digitsOnly : null;
+  return canonicalColombiaPhone(phone);
 }
 
 export function normalizeEmail(email?: string | null): string | null {
@@ -22,6 +27,26 @@ export function normalizeEmail(email?: string | null): string | null {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return null;
   return normalized;
+}
+
+/** Busca un cliente por teléfono (cualquier forma almacenada) o email. */
+async function findCustomerByCheckoutContact(phone: string | null, email: string | null, tx: any) {
+  const client = tx ?? db;
+  if (phone) {
+    const byPhone = await client.user.findFirst({
+      where: {
+        role: { equals: 'CUSTOMER', mode: 'insensitive' },
+        OR: phoneOrVariants(phone),
+      },
+    });
+    if (byPhone) return byPhone;
+  }
+  if (email) {
+    return client.user.findFirst({
+      where: { role: { equals: 'CUSTOMER', mode: 'insensitive' }, email },
+    });
+  }
+  return null;
 }
 
 export async function upsertCheckoutCustomer(
@@ -41,19 +66,13 @@ export async function upsertCheckoutCustomer(
     };
   }
 
-  let customer: any = null;
-  if (phone) {
-    customer = await tx.user.findUnique({ where: { phone } });
-  }
-
-  if (!customer && email) {
-    customer = await tx.user.findUnique({ where: { email } });
-  }
+  let customer: any = await findCustomerByCheckoutContact(phone, email, tx);
 
   if (customer) {
     const updateData: Record<string, string> = {};
 
-    if (phone && !customer.phone) updateData.phone = phone;
+    // Canonicaliza teléfonos legados al completar datos (escritura idempotente)
+    if (phone && customer.phone !== phone) updateData.phone = phone;
     if (email && !customer.email) updateData.email = email;
 
     const incomingName = input.name?.trim();
@@ -97,9 +116,7 @@ export async function upsertCheckoutCustomer(
     };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const existing = phone
-        ? await tx.user.findUnique({ where: { phone } })
-        : await tx.user.findUnique({ where: { email: email! } });
+      const existing = await findCustomerByCheckoutContact(phone, email, tx);
 
       if (existing) {
         return {
@@ -114,6 +131,61 @@ export async function upsertCheckoutCustomer(
 
     throw error;
   }
+}
+
+export interface SessionUserRef {
+  id: string;
+  role: string;
+}
+
+/**
+ * Resuelve el cliente (y su asesor asignado) al que se asociará un pedido.
+ *
+ * - Cliente autenticado (rol CUSTOMER) => su propia cuenta es el maestro; el
+ *   contacto del body solo complementa datos faltantes, nunca cambia la linked
+ *   account ni el asesor.
+ * - Invitado o ADMIN/AGENT => upsert por contacto (comportamiento existente
+ *   preservado para checkout de invitados y ventas asistidas).
+ */
+export async function resolveOrderCustomer(
+  sessionUser: SessionUserRef | null | undefined,
+  input: { name?: string | null; phone?: string | null; email?: string | null },
+  tx: any = db
+) {
+  if (sessionUser?.role?.toLowerCase() === 'customer') {
+    let customer = await tx.user.findUnique({ where: { id: sessionUser.id } });
+
+    if (customer && customer.isActive) {
+      const updateData: Record<string, string> = {};
+      const phone = normalizePhone(input.phone);
+      const email = normalizeEmail(input.email);
+
+      if (phone && !customer.phone) updateData.phone = phone;
+      if (email && !customer.email) updateData.email = email;
+
+      const incomingName = input.name?.trim();
+      if (incomingName && (!customer.name || customer.name === 'Nuevo Cliente')) {
+        updateData.name = incomingName.slice(0, 200);
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        customer = await tx.user.update({
+          where: { id: customer.id },
+          data: updateData,
+        });
+      }
+
+      return {
+        customer,
+        assignedAgentId: customer.assignedAgentId ?? null,
+        normalizedPhone: normalizePhone(input.phone),
+        normalizedEmail: normalizeEmail(input.email),
+        isNewCustomer: false,
+      };
+    }
+  }
+
+  return upsertCheckoutCustomer(input, tx);
 }
 
 export async function findBestRouteForCity(cityId?: string | null, now = new Date(), tx: any = db) {
@@ -160,12 +232,40 @@ export async function findBestRouteForCity(cityId?: string | null, now = new Dat
   return routesWithNextDeparture[0]?.route || null;
 }
 
-export async function processCheckout(checkoutData: any) {
+export interface ProcessCheckoutOptions {
+  /**
+   * Usuario de la sesión autenticada server-side (getCurrentUser()).
+   * Determina el enlace del pedido y el contexto del motor de precios.
+   * JAMÁS se acepta un customerId desde el navegador.
+   */
+  sessionUser?: SessionUserRef | null;
+}
+
+export async function processCheckout(
+  checkoutData: any,
+  options: ProcessCheckoutOptions = {}
+) {
   const { phone, email, name, items, cityId, cartId } = checkoutData;
+  const sessionUser = options.sessionUser ?? null;
 
   return createOrderTransactionWithRetry(async (tx: any) => {
-    const { validatedItems, subtotal } = await validateAndPriceItems(items, tx);
-    const customerResult = await upsertCheckoutCustomer({ name, phone, email }, tx);
+    // El cliente que determina el precio SOLO procede de la sesión
+    // autenticada o de una acción administrativa (nunca del body del invitado).
+    const pricingCustomerId = await resolveServerPricingCustomer(
+      sessionUser,
+      { phone, email },
+      tx
+    );
+
+    const { validatedItems, subtotal } = await validateAndPriceItems(items, tx, {
+      customerId: pricingCustomerId,
+    });
+
+    const customerResult = await resolveOrderCustomer(
+      sessionUser,
+      { name, phone, email },
+      tx
+    );
     const availableRoute = await findBestRouteForCity(cityId, new Date(), tx);
     const orderNumber = await generateOrderNumber(tx);
 

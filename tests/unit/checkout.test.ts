@@ -3,17 +3,27 @@ import { normalizePhone, normalizeEmail, upsertCheckoutCustomer } from '@/lib/ch
 import { getNextRouteDeparture, buildRouteMessage } from '@/lib/route-schedule';
 
 describe('Checkout and Customer Logic', () => {
-  describe('normalizePhone', () => {
-    it('strips non-digit characters and returns valid phone string', () => {
-      expect(normalizePhone('+593 99 123 4567')).toBe('593991234567');
-      expect(normalizePhone('099-876-5432')).toBe('0998765432');
+  describe('normalizePhone (canonicalización colombiana)', () => {
+    it('canonicaliza las 3 formas de la misma línea al MISMO valor', () => {
+      expect(normalizePhone('3001234567')).toBe('573001234567');
+      expect(normalizePhone('+57 300 123 4567')).toBe('573001234567');
+      expect(normalizePhone('573001234567')).toBe('573001234567');
+      expect(normalizePhone('(300) 123-4567')).toBe('573001234567');
     });
 
-    it('returns null for short or invalid phone numbers', () => {
+    it('acepta fijo moderno 60XXXXXXX', () => {
+      expect(normalizePhone('6063335206')).toBe('576063335206');
+      expect(normalizePhone('+576063335206')).toBe('576063335206');
+    });
+
+    it('returns null for short, foreign or invalid phone numbers', () => {
       expect(normalizePhone('123456')).toBeNull();
       expect(normalizePhone('abc')).toBeNull();
       expect(normalizePhone(null)).toBeNull();
       expect(normalizePhone(undefined)).toBeNull();
+      // Formato no colombiano (histórico extranjero): se rechaza, no se manglea
+      expect(normalizePhone('+593 99 123 4567')).toBeNull();
+      expect(normalizePhone('099-876-5432')).toBeNull();
     });
   });
 
@@ -36,45 +46,84 @@ describe('Checkout and Customer Logic', () => {
       expect(result.isNewCustomer).toBe(false);
     });
 
-    it('links existing customer by normalized phone', async () => {
+    it('links existing customer by canonical phone (busca en ambas formas almacenadas)', async () => {
       const mockTx = {
         user: {
-          findUnique: vi.fn().mockResolvedValue({
+          findFirst: vi.fn().mockResolvedValue({
             id: 'cust-1',
             name: 'Juan Perez',
-            phone: '0991234567',
+            phone: '573001234567',
             email: 'juan@test.com',
             assignedAgentId: 'agent-99',
           }),
+          update: vi.fn().mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'cust-1', phone: '573001234567', ...data })
+          ),
         },
       };
 
       const result = await upsertCheckoutCustomer(
-        { phone: '099-123-4567' },
+        { phone: '+57 300 123 4567' },
         mockTx
       );
 
       expect(result.customer.id).toBe('cust-1');
       expect(result.assignedAgentId).toBe('agent-99');
       expect(result.isNewCustomer).toBe(false);
+      // Búsqueda determinista por variantes (canónico + legado local)
+      expect(mockTx.user.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [{ phone: '573001234567' }, { phone: '3001234567' }],
+          }),
+        })
+      );
     });
 
-    it('creates new customer record when not found', async () => {
+    it('canonicaliza el teléfono legado de la cuenta al completar datos', async () => {
       const mockTx = {
         user: {
-          findUnique: vi.fn().mockResolvedValue(null),
+          findFirst: vi.fn().mockResolvedValue({
+            id: 'cust-1',
+            name: 'Juan Perez',
+            phone: '3001234567',
+            email: 'juan@test.com',
+            assignedAgentId: 'agent-99',
+          }),
+          update: vi.fn().mockImplementation(({ data }) =>
+            Promise.resolve({ id: 'cust-1', ...data })
+          ),
+        },
+      };
+
+      const result = await upsertCheckoutCustomer({ phone: '3001234567' }, mockTx);
+
+      expect(result.isNewCustomer).toBe(false);
+      expect(mockTx.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { phone: '573001234567' } })
+      );
+    });
+
+    it('creates new customer record when not found (teléfono canónico)', async () => {
+      const mockTx = {
+        user: {
+          findFirst: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'new-cust-1', ...data })),
         },
       };
 
       const result = await upsertCheckoutCustomer(
-        { name: 'Maria Gomez', phone: '0987654321', email: 'maria@test.com' },
+        { name: 'Maria Gomez', phone: '3009876543', email: 'maria@test.com' },
         mockTx
       );
 
       expect(result.customer.id).toBe('new-cust-1');
+      expect(result.customer.phone).toBe('573009876543');
       expect(result.customer.role).toBe('CUSTOMER');
       expect(result.isNewCustomer).toBe(true);
+      expect(mockTx.user.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ phone: '573009876543', role: 'CUSTOMER' }),
+      });
     });
   });
 
