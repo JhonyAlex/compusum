@@ -190,9 +190,24 @@ describe('Siesa Synchronization & Parser Unit Tests', () => {
     });
   });
 
+async function checkDbConnected(): Promise<boolean> {
+  try {
+    await db.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
   // ── 8. Idempotent Synchronization ──────────────────────────────────────────
   describe('Idempotent Synchronization', () => {
-    it('produces identical database state on consecutive identical imports', async () => {
+    it('produces identical database state on consecutive identical imports', async (ctx) => {
+      const dbConnected = await checkDbConnected();
+      if (!dbConnected) {
+        ctx.skip();
+        return;
+      }
+
       const csv = `"U.M.","Desc. item","MARCA","Referencia","Precio unitario","Existencia","Desc. detalle ext. 1","Desc. normal extensión 1 ",
 "UND ","ITEM IDEMPOTENCIA A","MARCA TEST","SKU-IDEM-1",$5.000,00,10,"GN       ","UNIDAD",
 "UND ","ITEM IDEMPOTENCIA B","MARCA TEST","SKU-IDEM-2",$10.000,00,20,"GN       ","UNIDAD",`;
@@ -224,7 +239,13 @@ describe('Siesa Synchronization & Parser Unit Tests', () => {
 
   // ── 9. Absent Reference Safe Reconciliation ────────────────────────────────
   describe('Absent Reference Safe Reconciliation', () => {
-    it('marks absent references as stock 0 and agotado without deleting them', async () => {
+    it('marks absent references as stock 0 and agotado without deleting them', async (ctx) => {
+      const dbConnected = await checkDbConnected();
+      if (!dbConnected) {
+        ctx.skip();
+        return;
+      }
+
       const csvRun1 = `"U.M.","Desc. item","MARCA","Referencia","Precio unitario","Existencia","Desc. detalle ext. 1","Desc. normal extensión 1 ",
 "UND ","PROD RECON A","MARCA RECON","SKU-RECON-A",$1.000,00,10,"GN       ","UNIDAD",
 "UND ","PROD RECON B","MARCA RECON","SKU-RECON-B",$2.000,00,15,"GN       ","UNIDAD",`;
@@ -271,7 +292,13 @@ describe('Siesa Synchronization & Parser Unit Tests', () => {
 
   // ── 11. Historical Cart & Order Snapshot Preservation ──────────────────────
   describe('Cart and Order Snapshot Preservation', () => {
-    it('preserves OrderItem snapshot prices and quantities even when product stock or price changes', async () => {
+    it('preserves OrderItem snapshot prices and quantities even when product stock or price changes', async (ctx) => {
+      const dbConnected = await checkDbConnected();
+      if (!dbConnected) {
+        ctx.skip();
+        return;
+      }
+
       // Create a test product
       const product = await db.product.create({
         data: {

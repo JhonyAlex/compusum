@@ -10,8 +10,24 @@ jobs:
   ci:
     name: Lint, Test and Build
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: compusum_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
-      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/compusum_db?schema=public"
+      DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/compusum_db?schema=public"
       NEXTAUTH_SECRET: "ci-secret-key-32-chars-long-test"
 
     steps:
@@ -28,6 +44,12 @@ jobs:
 
       - name: Run Prisma Client Generation
         run: bunx prisma generate
+
+      - name: Deploy Database Migrations
+        run: bunx prisma migrate deploy
+
+      - name: Run Operational Validation
+        run: bun run db:validate
 
       - name: Run Linter
         run: bun run lint
