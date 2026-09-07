@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseCSV } from "@/lib/csv";
+import { isSiesaPreflightApproved } from "@/lib/siesa-preflight";
 import {
   PRODUCT_FIELDS,
   detectDefaultMapping,
@@ -102,6 +103,7 @@ export function ImportadorCSV() {
   const [siesaIsDragging, setSiesaIsDragging] = useState(false);
   const [siesaShowErrors, setSiesaShowErrors] = useState(false);
   const siesaFileInputRef = useRef<HTMLInputElement>(null);
+  const siesaPreflightApproved = isSiesaPreflightApproved(siesaPreflight);
 
   // ── Siesa Handlers ──────────────────────────────────────────────────────────
   const handleSiesaFileSelect = async (f: File) => {
@@ -148,7 +150,7 @@ export function ImportadorCSV() {
   };
 
   const handleSiesaSync = async () => {
-    if (!siesaFile || !siesaConfirmed || !siesaPreflight) return;
+    if (!siesaFile || !siesaConfirmed || !siesaPreflightApproved) return;
     setSiesaLoading(true);
     setSiesaStep("syncing");
     setSiesaError(null);
@@ -579,9 +581,15 @@ export function ImportadorCSV() {
               <CardHeader>
                 <CardTitle className="text-base flex items-center justify-between">
                   <span>Resultado del Preflight (Análisis previo no mutante)</span>
-                  <span className="text-xs px-2.5 py-1 rounded bg-green-100 text-green-700 font-semibold">
-                    Preflight Aprobado
-                  </span>
+                  {siesaPreflightApproved ? (
+                    <span className="text-xs px-2.5 py-1 rounded bg-green-100 text-green-700 font-semibold">
+                      Preflight Aprobado
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2.5 py-1 rounded bg-red-100 text-red-700 font-semibold">
+                      Preflight Rechazado
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -642,7 +650,7 @@ export function ImportadorCSV() {
                         ))}
                       </ul>
                       <p className="mt-2 font-medium">
-                        Por seguridad de datos, la reconciliación de referencias ausentes ha sido bloqueada.
+                        Por seguridad de datos, la sincronización completa ha sido bloqueada hasta corregir el archivo.
                       </p>
                     </AlertDescription>
                   </Alert>
@@ -672,11 +680,17 @@ export function ImportadorCSV() {
                       </div>
                     </label>
 
-                    <label className="flex items-start gap-3 p-3 rounded-lg border border-blue-200 bg-blue-50/50 cursor-pointer">
+                    <label className={cn(
+                      "flex items-start gap-3 p-3 rounded-lg border",
+                      siesaPreflightApproved
+                        ? "border-blue-200 bg-blue-50/50 cursor-pointer"
+                        : "border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
+                    )}>
                       <input
                         type="checkbox"
                         checked={siesaConfirmed}
                         onChange={(e) => setSiesaConfirmed(e.target.checked)}
+                        disabled={!siesaPreflightApproved}
                         className="mt-0.5 rounded border-blue-400"
                       />
                       <div className="text-xs text-slate-800">
@@ -698,7 +712,7 @@ export function ImportadorCSV() {
                       </Button>
                       <Button
                         onClick={handleSiesaSync}
-                        disabled={!siesaConfirmed || siesaLoading}
+                        disabled={!siesaPreflightApproved || !siesaConfirmed || siesaLoading}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         <Lock className="h-4 w-4 mr-2" />

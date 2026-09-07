@@ -234,6 +234,7 @@ export async function runSiesaPreflight(
   const csvSkuSet = new Set(csvSkus);
   const activeDbProducts = await db.product.findMany({
     where: {
+      syncSource: 'siesa',
       sku: { not: null },
       stockQuantity: { gt: 0 },
     },
@@ -278,6 +279,11 @@ export async function executeSiesaSync(
   const parsed = parseSiesaCSV(rawInput);
   if (parsed.errors.some((e) => e.includes('Cabecera CSV inválida'))) {
     throw new Error('El archivo no corresponde inequívocamente al formato CSV de Siesa: cabecera inválida.');
+  }
+  if (parsed.errors.length > 0) {
+    throw new Error(
+      `El archivo Siesa contiene ${parsed.errors.length} error(es) de formato/parser. Corrija el archivo antes de sincronizar; no se aplicaron cambios.`
+    );
   }
   if (parsed.products.length === 0) {
     throw new Error('El archivo CSV no contiene registros de productos válidos.');

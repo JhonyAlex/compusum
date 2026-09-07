@@ -9,11 +9,69 @@ import {
   runSiesaPreflight,
   executeSiesaSync,
   acquireSyncLock,
+  releaseSyncLock,
 } from '@/lib/siesa-sync';
+import { isSiesaPreflightApproved } from '@/lib/siesa-preflight';
 import { validateAndPriceItems, CartValidationError } from '@/lib/cart-validation';
 import { db } from '@/lib/db';
 
 describe('Siesa Synchronization & Parser Unit Tests', () => {
+  describe('Preflight Safety Gates', () => {
+    it('counts and samples absent products only from the Siesa sync source', async () => {
+      const csv = `"U.M.","Desc. item","MARCA","Referencia","Precio unitario","Existencia","Desc. detalle ext. 1","Desc. normal extensión 1 ",
+"UND ","PRODUCTO PRESENTE","MARCA","SKU-PRESENTE",$1.000,00,10,"GN       ","UNIDAD",`;
+
+      const findManySpy = vi.spyOn(db.product, 'findMany')
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ sku: 'SKU-SIESA-AUSENTE' }] as never);
+
+      try {
+        const result = await runSiesaPreflight(csv);
+
+        expect(result.absentDepletedCount).toBe(1);
+        expect(result.absentSampleSkus).toEqual(['SKU-SIESA-AUSENTE']);
+        expect(findManySpy).toHaveBeenNthCalledWith(2, {
+          where: {
+            syncSource: 'siesa',
+            sku: { not: null },
+            stockQuantity: { gt: 0 },
+          },
+          select: { sku: true },
+        });
+      } finally {
+        findManySpy.mockRestore();
+      }
+    });
+
+    it('rejects parser errors for UI approval and sync before any database access', async () => {
+      const csvWithMalformedRow = `"U.M.","Desc. item","MARCA","Referencia","Precio unitario","Existencia","Desc. detalle ext. 1","Desc. normal extensión 1 ",
+"UND ","PRODUCTO VALIDO","MARCA","SKU-VALIDO",$10.000,00,10,"GN       ","UNIDAD",
+"UND ","FILA CORRUPTA","MARCA","SKU-CORRUPT",precio_invalido_sin_comas,"GN","UNIDAD",`;
+
+      const findManySpy = vi.spyOn(db.product, 'findMany')
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+      const queryRawSpy = vi.spyOn(db, '$queryRaw');
+      const syncLogCreateSpy = vi.spyOn(db.productSyncLog, 'create');
+
+      try {
+        const preflight = await runSiesaPreflight(csvWithMalformedRow);
+
+        expect(preflight.errors.length).toBeGreaterThan(0);
+        expect(isSiesaPreflightApproved(preflight)).toBe(false);
+        await expect(
+          executeSiesaSync(csvWithMalformedRow, { fileName: 'parser-errors.csv' })
+        ).rejects.toThrow('error(es) de formato/parser');
+        expect(queryRawSpy).not.toHaveBeenCalled();
+        expect(syncLogCreateSpy).not.toHaveBeenCalled();
+      } finally {
+        findManySpy.mockRestore();
+        queryRawSpy.mockRestore();
+        syncLogCreateSpy.mockRestore();
+      }
+    });
+  });
+
   // ── 1. Colombian Price Parsing ──────────────────────────────────────────────
   describe('Colombian Currency Parsing', () => {
     it('correctly parses $1.845,02 into 1845.02', () => {
@@ -316,20 +374,18 @@ async function checkDbConnected(): Promise<boolean> {
 "UND ","PRODUCTO NUEVO VALIDO","MARCA VALIDA","${testSkuNew}",$10.000,00,10,"GN       ","UNIDAD",
 "UND ","FILA CORRUPTA","MARCA","SKU-CORRUPT",precio_invalido_sin_comas,"GN","UNIDAD",`;
 
-        const result = await executeSiesaSync(csvWithMalformedRow, {
-          fileName: 'partial-fail-test.csv',
-          reconcileAbsent: true,
-        });
+        const syncLogCountBefore = await db.productSyncLog.count();
 
-        // Parser error must strictly prevent reconciliation
-        expect(result.errors.length).toBeGreaterThan(0);
-        expect(result.depletedCount).toBe(0);
+        await expect(
+          executeSiesaSync(csvWithMalformedRow, {
+            fileName: 'partial-fail-test.csv',
+            reconcileAbsent: true,
+          })
+        ).rejects.toThrow('error(es) de formato/parser');
 
-        // Audit status in DB must be 'failed'
-        const syncLog = await db.productSyncLog.findUnique({
-          where: { id: result.syncLogId },
-        });
-        expect(syncLog?.status).toBe('failed');
+        // Parser errors must reject before product or audit-log writes.
+        expect(await db.product.findUnique({ where: { sku: testSkuNew } })).toBeNull();
+        expect(await db.productSyncLog.count()).toBe(syncLogCountBefore);
 
         // Pre-existing product must NOT be depleted
         const refreshedExisting = await db.product.findUnique({
@@ -492,7 +548,7 @@ async function checkDbConnected(): Promise<boolean> {
 
   // ── 12. Concurrency: Atomic Mutual Exclusion in PostgreSQL ─────────────────
   describe('PostgreSQL Atomic Concurrency Lock', () => {
-    it('admits exactly one of two simultaneous synchronizations and rejects the other', async (ctx) => {
+    it('rejects synchronization while the lock is held and permits it after release', async (ctx) => {
       const dbConnected = await checkDbConnected();
       if (!dbConnected) {
         ctx.skip();
@@ -502,24 +558,25 @@ async function checkDbConnected(): Promise<boolean> {
       const csv = `"U.M.","Desc. item","MARCA","Referencia","Precio unitario","Existencia","Desc. detalle ext. 1","Desc. normal extensión 1 ",
 "UND ","ITEM CONCURRENCIA","MARCA CONCURRENTE","SKU-CONC-1",$1.000,00,10,"GN       ","UNIDAD",`;
 
-      // Launch two sync executions concurrently
-      const [res1, res2] = await Promise.allSettled([
-        executeSiesaSync(csv, { fileName: 'conc-test-1.csv' }),
-        executeSiesaSync(csv, { fileName: 'conc-test-2.csv' }),
-      ]);
+      const holderId = `test-holder-${Date.now()}`;
+      await db.syncLock.deleteMany({ where: { id: 'siesa_sync' } });
+      const lock = await acquireSyncLock(holderId);
+      expect(lock).toMatchObject({ acquired: true, holderId });
 
-      const fulfilled = [res1, res2].filter((r) => r.status === 'fulfilled');
-      const rejected = [res1, res2].filter((r) => r.status === 'rejected');
-
-      expect(fulfilled).toHaveLength(1);
-      expect(rejected).toHaveLength(1);
-
-      if (rejected[0].status === 'rejected') {
-        expect(rejected[0].reason.message).toContain('Otra sincronización está actualmente en progreso');
+      try {
+        await expect(
+          executeSiesaSync(csv, { fileName: 'conc-test-blocked.csv' })
+        ).rejects.toThrow('Otra sincronización está actualmente en progreso');
+      } finally {
+        await releaseSyncLock(holderId);
       }
 
-      // Cleanup
-      await db.product.deleteMany({ where: { sku: 'SKU-CONC-1' } });
+      try {
+        const result = await executeSiesaSync(csv, { fileName: 'conc-test-permitted.csv' });
+        expect(result.errorCount).toBe(0);
+      } finally {
+        await db.product.deleteMany({ where: { sku: 'SKU-CONC-1' } });
+      }
     });
   });
 
@@ -656,4 +713,3 @@ async function checkDbConnected(): Promise<boolean> {
     });
   });
 });
-
