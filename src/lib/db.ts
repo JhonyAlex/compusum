@@ -7,13 +7,17 @@ const globalForPrisma = globalThis as unknown as {
 const prismaLogLevels =
   process.env.NODE_ENV === 'production' ? ['error'] : ['query', 'warn', 'error']
 
+const databaseUrl =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@localhost:5432/compusum_db?schema=public'
+
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: prismaLogLevels,
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: databaseUrl,
       },
     },
   })

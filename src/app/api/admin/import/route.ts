@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { requireAdminApi } from '@/lib/auth';
 import type { ProductGroup } from '@/lib/csv-import';
 import { normalizeProductImagePath } from '@/lib/product-fallbacks';
+import { parseColombianPrice } from '@/lib/siesa-parser';
+import { runSiesaPreflight, executeSiesaSync } from '@/lib/siesa-sync';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -18,12 +20,7 @@ function toSlug(text: string): string {
 
 function parseCurrency(value?: string | number | null): number | null {
   if (value === null || value === undefined || value === '') return null;
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-  const normalized = value.trim().replace(/[^\d.,]/g, '').replace(',', '.');
-  if (!normalized) return null;
-  const parsed = parseFloat(normalized);
+  const parsed = parseColombianPrice(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -67,15 +64,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'duplicateMode inválido' }, { status: 400 });
   }
 
-  let products: ProductGroup[];
+  let body: any;
   try {
-    const body = await request.json();
-    products = body.products ?? [];
-    if (!Array.isArray(products)) {
-      return NextResponse.json({ success: false, error: 'El campo "products" debe ser un arreglo' }, { status: 400 });
-    }
+    body = await request.json();
   } catch {
     return NextResponse.json({ success: false, error: 'JSON malformado en el cuerpo de la petición' }, { status: 400 });
+  }
+
+  // ── Siesa direct actions: preflight & sync ────────────────────────────────
+  if (body?.action === 'preflight') {
+    if (!body.rawCSV) {
+      return NextResponse.json({ success: false, error: 'Falta rawCSV para preflight' }, { status: 400 });
+    }
+    const summary = await runSiesaPreflight(body.rawCSV);
+    return NextResponse.json({ success: true, data: summary });
+  }
+
+  if (body?.action === 'sync') {
+    if (!body.rawCSV) {
+      return NextResponse.json({ success: false, error: 'Falta rawCSV para sincronización' }, { status: 400 });
+    }
+    try {
+      const result = await executeSiesaSync(body.rawCSV, {
+        fileName: body.fileName,
+        reconcileAbsent: body.reconcileAbsent ?? true,
+        batchSize: body.batchSize ?? 50,
+      });
+      return NextResponse.json({ success: true, data: result });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error en sincronización Siesa';
+      return NextResponse.json({ success: false, error: msg }, { status: 409 });
+    }
+  }
+
+  let products: ProductGroup[] = body?.products ?? [];
+  if (!Array.isArray(products)) {
+    return NextResponse.json({ success: false, error: 'El campo "products" debe ser un arreglo' }, { status: 400 });
   }
 
   if (products.length === 0) {
@@ -220,6 +244,8 @@ export async function POST(request: Request) {
           continue;
         }
         // duplicateMode === 'update'
+        const stockQuantity = group.stock ?? 0;
+        const stockStatus = stockQuantity > 0 ? 'disponible' : 'agotado';
         await db.product.update({
           where: { id: existingProduct.id },
           data: {
@@ -229,6 +255,10 @@ export async function POST(request: Request) {
             categoryId,
             brandId,
             price: productPrice,
+            stockQuantity,
+            stockStatus,
+            lastSyncAt: new Date(),
+            syncSource: 'siesa',
             ...(normalizedImagePath && {
               images: {
                 deleteMany: {},
@@ -244,6 +274,8 @@ export async function POST(request: Request) {
         const slugTaken = await db.product.findUnique({ where: { slug } });
         if (slugTaken) slug = `${slug}-${Date.now()}`;
 
+        const stockQuantity = group.stock ?? 0;
+        const stockStatus = stockQuantity > 0 ? 'disponible' : 'agotado';
         const created = await db.product.create({
           data: {
             name,
@@ -254,6 +286,10 @@ export async function POST(request: Request) {
             categoryId,
             brandId,
             price: productPrice,
+            stockQuantity,
+            stockStatus,
+            lastSyncAt: new Date(),
+            syncSource: 'siesa',
             ...(normalizedImagePath && {
               images: {
                 create: [{ imagePath: normalizedImagePath, isPrimary: true, sortOrder: 0 }],
@@ -273,6 +309,8 @@ export async function POST(request: Request) {
         if (!normalizedName) continue;
 
         const variantPrice = parseCurrency(v.price) ?? productPrice;
+        const variantStock = v.stock ?? 0;
+        const variantStockStatus = variantStock > 0 ? 'disponible' : 'agotado';
         await db.productVariant.upsert({
           where: {
             productId_normalizedName: {
@@ -284,7 +322,9 @@ export async function POST(request: Request) {
             name: v.name,
             code: v.code || null,
             price: variantPrice,
-            stockStatus: 'disponible',
+            stockQuantity: variantStock,
+            stockStatus: variantStockStatus,
+            lastSyncAt: new Date(),
             isActive: true,
           },
           create: {
@@ -293,7 +333,9 @@ export async function POST(request: Request) {
             code: v.code || null,
             normalizedName,
             price: variantPrice,
-            stockStatus: 'disponible',
+            stockQuantity: variantStock,
+            stockStatus: variantStockStatus,
+            lastSyncAt: new Date(),
             sortOrder: vi,
           },
         });

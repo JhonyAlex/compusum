@@ -125,6 +125,7 @@ model Product {
   price            Float?
   wholesalePrice   Float?
   minWholesaleQty  Int             @default(1)
+  stockQuantity    Int             @default(0)
   stockStatus      String          @default("disponible") // disponible, agotado, por_pedido
   isFeatured       Boolean         @default(false)
   isNew            Boolean         @default(false)
@@ -136,6 +137,8 @@ model Product {
   metaTitle        String?
   metaDescription  String?
   searchVector     Unsupported("tsvector")?
+  lastSyncAt       DateTime?
+  syncSource       String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   images           ProductImage[]
@@ -163,9 +166,11 @@ model ProductVariant {
   normalizedName String
   price          Float?
   wholesalePrice Float?
+  stockQuantity  Int       @default(0)
   stockStatus    String    @default("disponible")
   sortOrder      Int       @default(0)
   isActive       Boolean   @default(true)
+  lastSyncAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   cartItems      CartItem[]
@@ -465,5 +470,28 @@ model RateLimit {
   @@index([blockedUntil])
 }
 
+// =====================
+// REGISTRO DE SINCRONIZACIÓN DE PRODUCTOS (AUDITORÍA)
+// =====================
+model ProductSyncLog {
+  id             String    @id @default(cuid())
+  fileName       String
+  fileHash       String
+  status         String    @default("running") // running, completed, failed
+  totalRows      Int       @default(0)
+  uniqueRefs     Int       @default(0)
+  createdCount   Int       @default(0)
+  updatedCount   Int       @default(0)
+  unchangedCount Int       @default(0)
+  zeroPriceCount Int       @default(0)
+  depletedCount  Int       @default(0)
+  errorCount     Int       @default(0)
+  errors         String?   // JSON con arreglo de errores
+  metadata       String?   // JSON con metadatos y opciones
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
 
-
+  @@index([fileHash])
+  @@index([status])
+  @@index([startedAt])
+}

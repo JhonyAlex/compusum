@@ -10,31 +10,30 @@ jobs:
   ci:
     name: Lint, Test and Build
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/compusum_db?schema=public"
+      NEXTAUTH_SECRET: "ci-secret-key-32-chars-long-test"
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: 'npm'
+          bun-version: latest
 
       - name: Install Dependencies
-        run: npm ci
+        run: bun install
 
       - name: Run Prisma Client Generation
-        run: npx prisma generate
+        run: bunx prisma generate
 
       - name: Run Linter
-        run: npm run lint
+        run: bun run lint
 
       - name: Run Unit Tests
-        run: npm run test
+        run: bun run test
 
       - name: Run Application Build
-        run: npm run build
-        env:
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/compusum_db?schema=public"
-          NEXTAUTH_SECRET: "ci-secret-key-32-chars-long-test"
+        run: bun run build

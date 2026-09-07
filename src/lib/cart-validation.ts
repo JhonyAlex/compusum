@@ -141,6 +141,13 @@ export async function validateAndPriceItems(
       unitPrice = product.wholesalePrice ?? product.price ?? 0;
     }
 
+    if (unitPrice <= 0) {
+      const displayName = variantName ? `"${product.name} (${variantName})"` : `"${product.name}"`;
+      throw new CartValidationError(
+        `El producto ${displayName} requiere cotización y no puede tramitarse con precio COP 0.`
+      );
+    }
+
     validatedItems.push({
       productId: product.id,
       productName: product.name,
