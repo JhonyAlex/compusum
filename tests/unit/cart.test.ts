@@ -96,6 +96,7 @@ describe('Cart Validation and Pricing Logic', () => {
             sku: 'SKU-RAM-8',
             isActive: true,
             stockStatus: 'disponible',
+            stockQuantity: 10,
             minWholesaleQty: 1,
             price: 50,
             wholesalePrice: 40,
@@ -134,6 +135,7 @@ describe('Cart Validation and Pricing Logic', () => {
             name: 'Camiseta',
             isActive: true,
             stockStatus: 'disponible',
+            stockQuantity: 20,
             price: 20,
             variants: [
               {
@@ -143,6 +145,7 @@ describe('Cart Validation and Pricing Logic', () => {
                 code: 'CAM-L',
                 isActive: true,
                 stockStatus: 'disponible',
+                stockQuantity: 10,
                 price: 25,
                 wholesalePrice: 22,
               },

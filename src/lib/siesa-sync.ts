@@ -77,26 +77,65 @@ function normalizeVariantName(value?: string): string {
     .toLowerCase();
 }
 
-// ─── Concurrency Lock ────────────────────────────────────────────────────────
+// ─── Concurrency Lock (Atomic Mutual Exclusion in PostgreSQL) ────────────────
 
+const SIESA_LOCK_KEY = 'siesa_sync';
 const LOCK_TIMEOUT_MINUTES = 15;
 
-export async function acquireSyncLock(): Promise<{ acquired: boolean; runningLogId?: string }> {
-  const cutoff = new Date(Date.now() - LOCK_TIMEOUT_MINUTES * 60 * 1000);
+export interface SyncLockResult {
+  acquired: boolean;
+  runningLogId?: string;
+  holderId?: string;
+}
 
-  const activeSync = await db.productSyncLog.findFirst({
-    where: {
-      status: 'running',
-      startedAt: { gt: cutoff },
-    },
-    select: { id: true, startedAt: true },
-  });
+export async function acquireSyncLock(holderId?: string): Promise<SyncLockResult> {
+  const effectiveHolderId =
+    holderId || `sync_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const timeoutMs = LOCK_TIMEOUT_MINUTES * 60 * 1000;
+  const expiresAt = new Date(Date.now() + timeoutMs);
 
-  if (activeSync) {
-    return { acquired: false, runningLogId: activeSync.id };
+  try {
+    const result = await db.$queryRaw<{ holderId: string }[]>`
+      INSERT INTO "SyncLock" ("id", "holderId", "acquiredAt", "expiresAt")
+      VALUES (${SIESA_LOCK_KEY}, ${effectiveHolderId}, NOW(), ${expiresAt})
+      ON CONFLICT ("id") DO UPDATE
+      SET "holderId" = EXCLUDED."holderId",
+          "acquiredAt" = EXCLUDED."acquiredAt",
+          "expiresAt" = EXCLUDED."expiresAt"
+      WHERE "SyncLock"."expiresAt" < NOW()
+      RETURNING "holderId"
+    `;
+
+    if (result.length > 0 && result[0].holderId === effectiveHolderId) {
+      return { acquired: true, holderId: effectiveHolderId };
+    }
+
+    const activeLog = await db.productSyncLog.findFirst({
+      where: { status: 'running' },
+      orderBy: { startedAt: 'desc' },
+      select: { id: true },
+    });
+
+    return {
+      acquired: false,
+      runningLogId: activeLog?.id,
+    };
+  } catch (error) {
+    console.error('Error al adquirir lock atómico en PostgreSQL:', error);
+    return { acquired: false };
   }
+}
 
-  return { acquired: true };
+export async function releaseSyncLock(holderId: string): Promise<void> {
+  if (!holderId) return;
+  try {
+    await db.$executeRaw`
+      DELETE FROM "SyncLock"
+      WHERE "id" = ${SIESA_LOCK_KEY} AND "holderId" = ${holderId}
+    `;
+  } catch (err) {
+    console.error('Error al liberar lock de sincronización:', err);
+  }
 }
 
 // ─── Preflight Analysis ──────────────────────────────────────────────────────
@@ -235,44 +274,48 @@ export async function executeSiesaSync(
   const fileName = options.fileName || 'Productos.csv';
   const batchSize = options.batchSize || 50;
 
-  // 1. Check concurrency
-  const lock = await acquireSyncLock();
-  if (!lock.acquired) {
-    throw new Error(
-      `Otra sincronización está actualmente en progreso (Sync ID: ${lock.runningLogId}). Espere a que finalice.`
-    );
-  }
-
-  // 2. Parse CSV
+  // 1. Parse CSV and validate Siesa format strictly BEFORE database writes
   const parsed = parseSiesaCSV(rawInput);
+  if (parsed.errors.some((e) => e.includes('Cabecera CSV inválida'))) {
+    throw new Error('El archivo no corresponde inequívocamente al formato CSV de Siesa: cabecera inválida.');
+  }
   if (parsed.products.length === 0) {
     throw new Error('El archivo CSV no contiene registros de productos válidos.');
   }
 
-  // 3. Create Audit Log
-  const syncLog = await db.productSyncLog.create({
-    data: {
-      fileName,
-      fileHash,
-      status: 'running',
-      totalRows: parsed.totalRows,
-      uniqueRefs: parsed.uniqueReferences,
-      zeroPriceCount: parsed.zeroPriceReferences,
-      startedAt: new Date(),
-      metadata: JSON.stringify({
-        reconcileAbsent: options.reconcileAbsent ?? true,
-        batchSize,
-      }),
-    },
-  });
-
-  let createdCount = 0;
-  let updatedCount = 0;
-  let unchangedCount = 0;
-  let depletedCount = 0;
-  const executionErrors: string[] = [...parsed.errors];
+  // 2. Atomic PostgreSQL concurrency lock
+  const lock = await acquireSyncLock();
+  if (!lock.acquired || !lock.holderId) {
+    throw new Error(
+      `Otra sincronización está actualmente en progreso (Sync ID: ${lock.runningLogId || 'activo'}). Espere a que finalice.`
+    );
+  }
 
   try {
+    // 3. Create Audit Log
+    const syncLog = await db.productSyncLog.create({
+      data: {
+        fileName,
+        fileHash,
+        status: 'running',
+        totalRows: parsed.totalRows,
+        uniqueRefs: parsed.uniqueReferences,
+        zeroPriceCount: parsed.zeroPriceReferences,
+        startedAt: new Date(),
+        metadata: JSON.stringify({
+          reconcileAbsent: options.reconcileAbsent ?? true,
+          batchSize,
+        }),
+      },
+    });
+
+    let createdCount = 0;
+    let updatedCount = 0;
+    let unchangedCount = 0;
+    let depletedCount = 0;
+    const executionErrors: string[] = [...parsed.errors];
+
+    try {
     // 4. Preload brands and ensure fallback category
     const allBrands = await db.brand.findMany({ select: { id: true, name: true, slug: true } });
     const brandMap = new Map(allBrands.map((b) => [normalizeLookup(b.name), b]));
@@ -465,12 +508,12 @@ export async function executeSiesaSync(
     }
 
     // 6. Absent Reference Safe Reconciliation
-    // "No hagas una reconciliación de referencias ausentes si cualquier lote del CSV falla."
-    // "Evita que una carga parcial pueda provocar que miles de productos queden agotados."
+    // Only reconcile if explicitly enabled, zero parser errors, zero batch failures, and zero execution errors.
     const shouldReconcile =
-      (options.reconcileAbsent ?? true) &&
+      Boolean(options.reconcileAbsent) &&
+      parsed.errors.length === 0 &&
       !hadBatchFailure &&
-      executionErrors.length === parsed.errors.length;
+      executionErrors.length === 0;
 
     if (shouldReconcile) {
       // Find Siesa products that were NOT touched in this run and have stock > 0
@@ -512,8 +555,9 @@ export async function executeSiesaSync(
       }
     }
 
-    // 7. Complete Audit Log
-    const finalStatus = hadBatchFailure ? 'failed' : 'completed';
+    // 7. Complete Audit Log (never completed if there are any parser or batch errors)
+    const hasAnyError = hadBatchFailure || parsed.errors.length > 0 || executionErrors.length > 0;
+    const finalStatus = hasAnyError ? 'failed' : 'completed';
     await db.productSyncLog.update({
       where: { id: syncLog.id },
       data: {
@@ -557,5 +601,8 @@ export async function executeSiesaSync(
     });
 
     throw fatalErr;
+  }
+  } finally {
+    await releaseSyncLock(lock.holderId);
   }
 }

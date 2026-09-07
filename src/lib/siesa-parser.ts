@@ -142,9 +142,21 @@ export function isSiesaCSVHeader(headerLine: string): boolean {
 export function parseSiesaCSV(rawInput: string | Buffer | Uint8Array): ParsedSiesaResult {
   const text = decodeSiesaBuffer(rawInput);
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-  const dataLines = lines.slice(1).filter((l) => l.trim().length > 0);
+  const headerLine = lines[0]?.trim() || '';
 
   const errors: string[] = [];
+  if (!isSiesaCSVHeader(headerLine)) {
+    errors.push('Cabecera CSV inválida para formato Siesa. Se esperaba formato con columnas U.M., Desc. item, MARCA, Referencia, Precio unitario, Existencia.');
+    return {
+      totalRows: 0,
+      products: [],
+      uniqueReferences: 0,
+      zeroPriceReferences: 0,
+      errors,
+    };
+  }
+
+  const dataLines = lines.slice(1).filter((l) => l.trim().length > 0);
   const rawItems: SiesaRawItem[] = [];
 
   // Exact regex matching the Siesa export layout:

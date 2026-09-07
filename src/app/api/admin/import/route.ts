@@ -258,7 +258,7 @@ export async function POST(request: Request) {
             stockQuantity,
             stockStatus,
             lastSyncAt: new Date(),
-            syncSource: 'siesa',
+            syncSource: existingProduct.syncSource || 'csv',
             ...(normalizedImagePath && {
               images: {
                 deleteMany: {},
@@ -289,7 +289,7 @@ export async function POST(request: Request) {
             stockQuantity,
             stockStatus,
             lastSyncAt: new Date(),
-            syncSource: 'siesa',
+            syncSource: 'csv',
             ...(normalizedImagePath && {
               images: {
                 create: [{ imagePath: normalizedImagePath, isPrimary: true, sortOrder: 0 }],

@@ -172,6 +172,7 @@ describe('Siesa Synchronization & Parser Unit Tests', () => {
               sku: '005555',
               isActive: true,
               stockStatus: 'disponible',
+              stockQuantity: 10,
               price: 0,
               wholesalePrice: null,
               variants: [],
@@ -277,16 +278,127 @@ async function checkDbConnected(): Promise<boolean> {
     });
   });
 
-  // ── 10. Partial Failure Prevents Destructive Reconciliation ────────────────
-  describe('Partial Failure Protection', () => {
-    it('skips absent reconciliation if any batch fails', async () => {
-      // If reconcileAbsent is false or if there are batch errors, reconciliation is aborted
-      const preflight = await runSiesaPreflight(
-        `"U.M.","Desc. item","MARCA","Referencia","Precio unitario","Existencia","Desc. detalle ext. 1","Desc. normal extensión 1 ",
-"UND ","PROD CORRUPT","MARCA","SKU-FAIL",invalid-price-and-stock,"GN","UNIDAD",`
+  // ── 10. Partial Failure Protection & Safe Reconciliation ───────────────────
+  describe('Partial Failure Protection & Safe Reconciliation', () => {
+    it('does NOT deplete absent references when CSV contains a malformed row', async (ctx) => {
+      const dbConnected = await checkDbConnected();
+      if (!dbConnected) {
+        ctx.skip();
+        return;
+      }
+
+      const testSkuExisting = `SKU-PRE-EXIST-${Date.now()}`;
+      const testSkuNew = `SKU-VALID-${Date.now()}`;
+
+      // 1. Create a pre-existing Siesa product with stock
+      const existingProduct = await db.product.create({
+        data: {
+          name: 'Producto Siesa Preexistente',
+          slug: `prod-pre-exist-${Date.now()}`,
+          sku: testSkuExisting,
+          price: 15000,
+          stockQuantity: 25,
+          stockStatus: 'disponible',
+          syncSource: 'siesa',
+          lastSyncAt: new Date(Date.now() - 3600000),
+          category: {
+            connectOrCreate: {
+              where: { slug: 'sin-categoria' },
+              create: { name: 'Sin categoría', slug: 'sin-categoria' },
+            },
+          },
+        },
+      });
+
+      try {
+        // 2. CSV with a valid row and a malformed row (absent reference is testSkuExisting)
+        const csvWithMalformedRow = `"U.M.","Desc. item","MARCA","Referencia","Precio unitario","Existencia","Desc. detalle ext. 1","Desc. normal extensión 1 ",
+"UND ","PRODUCTO NUEVO VALIDO","MARCA VALIDA","${testSkuNew}",$10.000,00,10,"GN       ","UNIDAD",
+"UND ","FILA CORRUPTA","MARCA","SKU-CORRUPT",precio_invalido_sin_comas,"GN","UNIDAD",`;
+
+        const result = await executeSiesaSync(csvWithMalformedRow, {
+          fileName: 'partial-fail-test.csv',
+          reconcileAbsent: true,
+        });
+
+        // Parser error must strictly prevent reconciliation
+        expect(result.errors.length).toBeGreaterThan(0);
+        expect(result.depletedCount).toBe(0);
+
+        // Audit status in DB must be 'failed'
+        const syncLog = await db.productSyncLog.findUnique({
+          where: { id: result.syncLogId },
+        });
+        expect(syncLog?.status).toBe('failed');
+
+        // Pre-existing product must NOT be depleted
+        const refreshedExisting = await db.product.findUnique({
+          where: { id: existingProduct.id },
+        });
+        expect(refreshedExisting?.stockQuantity).toBe(25);
+        expect(refreshedExisting?.stockStatus).toBe('disponible');
+      } finally {
+        await db.product.deleteMany({
+          where: { sku: { in: [testSkuExisting, testSkuNew] } },
+        });
+      }
+    });
+
+    it('does NOT deplete absent references when a batch transaction fails', async (ctx) => {
+      const dbConnected = await checkDbConnected();
+      if (!dbConnected) {
+        ctx.skip();
+        return;
+      }
+
+      const testSkuExisting = `SKU-BATCH-FAIL-${Date.now()}`;
+
+      const existingProduct = await db.product.create({
+        data: {
+          name: 'Producto Preexistente Batch Test',
+          slug: `prod-batch-exist-${Date.now()}`,
+          sku: testSkuExisting,
+          price: 20000,
+          stockQuantity: 50,
+          stockStatus: 'disponible',
+          syncSource: 'siesa',
+          lastSyncAt: new Date(Date.now() - 3600000),
+          category: {
+            connectOrCreate: {
+              where: { slug: 'sin-categoria' },
+              create: { name: 'Sin categoría', slug: 'sin-categoria' },
+            },
+          },
+        },
+      });
+
+      const txSpy = vi.spyOn(db, '$transaction').mockRejectedValueOnce(
+        new Error('Simulated PostgreSQL transaction batch failure')
       );
 
-      expect(preflight.errors.length).toBeGreaterThan(0);
+      try {
+        const validCsv = `"U.M.","Desc. item","MARCA","Referencia","Precio unitario","Existencia","Desc. detalle ext. 1","Desc. normal extensión 1 ",
+"UND ","PRODUCTO VALIDO","MARCA","SKU-BATCH-NEW",$5.000,00,10,"GN       ","UNIDAD",`;
+
+        const result = await executeSiesaSync(validCsv, {
+          fileName: 'batch-fail-test.csv',
+          reconcileAbsent: true,
+        });
+
+        expect(result.depletedCount).toBe(0);
+        expect(result.errors.length).toBeGreaterThan(0);
+
+        const refreshedExisting = await db.product.findUnique({
+          where: { id: existingProduct.id },
+        });
+        expect(refreshedExisting?.stockQuantity).toBe(50);
+        expect(refreshedExisting?.stockStatus).toBe('disponible');
+      } finally {
+        txSpy.mockRestore();
+        await db.product.deleteMany({
+          where: { sku: { in: [testSkuExisting, 'SKU-BATCH-NEW'] } },
+        });
+      }
     });
   });
 
@@ -377,4 +489,171 @@ async function checkDbConnected(): Promise<boolean> {
       await db.product.delete({ where: { id: product.id } });
     });
   });
+
+  // ── 12. Concurrency: Atomic Mutual Exclusion in PostgreSQL ─────────────────
+  describe('PostgreSQL Atomic Concurrency Lock', () => {
+    it('admits exactly one of two simultaneous synchronizations and rejects the other', async (ctx) => {
+      const dbConnected = await checkDbConnected();
+      if (!dbConnected) {
+        ctx.skip();
+        return;
+      }
+
+      const csv = `"U.M.","Desc. item","MARCA","Referencia","Precio unitario","Existencia","Desc. detalle ext. 1","Desc. normal extensión 1 ",
+"UND ","ITEM CONCURRENCIA","MARCA CONCURRENTE","SKU-CONC-1",$1.000,00,10,"GN       ","UNIDAD",`;
+
+      // Launch two sync executions concurrently
+      const [res1, res2] = await Promise.allSettled([
+        executeSiesaSync(csv, { fileName: 'conc-test-1.csv' }),
+        executeSiesaSync(csv, { fileName: 'conc-test-2.csv' }),
+      ]);
+
+      const fulfilled = [res1, res2].filter((r) => r.status === 'fulfilled');
+      const rejected = [res1, res2].filter((r) => r.status === 'rejected');
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+
+      if (rejected[0].status === 'rejected') {
+        expect(rejected[0].reason.message).toContain('Otra sincronización está actualmente en progreso');
+      }
+
+      // Cleanup
+      await db.product.deleteMany({ where: { sku: 'SKU-CONC-1' } });
+    });
+  });
+
+  // ── 13. Commercial Inventory Validation & Overselling Prevention ────────────
+  describe('Commercial Inventory Validation & Overselling Prevention', () => {
+    it('rejects order when product stock is 1 and requested quantity is 2', async () => {
+      const mockTx = {
+        product: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: 'prod-stock-1',
+              name: 'Cuaderno Profesional',
+              sku: '001001',
+              isActive: true,
+              stockStatus: 'disponible',
+              stockQuantity: 1, // Only 1 available
+              price: 5000,
+              wholesalePrice: null,
+              variants: [],
+            },
+          ]),
+        },
+      };
+
+      await expect(
+        validateAndPriceItems([{ productId: 'prod-stock-1', quantity: 2 }], mockTx)
+      ).rejects.toThrow(CartValidationError);
+
+      await expect(
+        validateAndPriceItems([{ productId: 'prod-stock-1', quantity: 2 }], mockTx)
+      ).rejects.toThrow('No hay suficiente disponibilidad para "Cuaderno Profesional". Solicitado: 2, disponible: 1.');
+    });
+
+    it('rejects order when variant stock is 3 and requested quantity is 4', async () => {
+      const mockTx = {
+        product: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: 'prod-var-test',
+              name: 'Marcador Permanente',
+              sku: '002002',
+              isActive: true,
+              stockStatus: 'disponible',
+              stockQuantity: 10,
+              price: 3000,
+              wholesalePrice: null,
+              variants: [
+                {
+                  id: 'var-azul',
+                  productId: 'prod-var-test',
+                  name: 'Azul',
+                  code: 'AZ',
+                  isActive: true,
+                  stockStatus: 'disponible',
+                  stockQuantity: 3, // Only 3 available
+                  price: 3000,
+                  wholesalePrice: null,
+                },
+              ],
+            },
+          ]),
+        },
+      };
+
+      await expect(
+        validateAndPriceItems(
+          [{ productId: 'prod-var-test', variantId: 'var-azul', quantity: 4 }],
+          mockTx
+        )
+      ).rejects.toThrow(CartValidationError);
+
+      await expect(
+        validateAndPriceItems(
+          [{ productId: 'prod-var-test', variantId: 'var-azul', quantity: 4 }],
+          mockTx
+        )
+      ).rejects.toThrow('No hay suficiente disponibilidad para "Marcador Permanente (Azul)". Solicitado: 4, disponible: 3.');
+    });
+
+    it('accepts orders when requested quantities are <= stock', async () => {
+      const mockTx = {
+        product: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: 'prod-ok-simple',
+              name: 'Borrador de Nata',
+              sku: '003003',
+              isActive: true,
+              stockStatus: 'disponible',
+              stockQuantity: 10,
+              price: 1200,
+              wholesalePrice: null,
+              variants: [],
+            },
+            {
+              id: 'prod-ok-var',
+              name: 'Resaltador Fluo',
+              sku: '004004',
+              isActive: true,
+              stockStatus: 'disponible',
+              stockQuantity: 15,
+              price: 2500,
+              wholesalePrice: null,
+              variants: [
+                {
+                  id: 'var-amarillo',
+                  productId: 'prod-ok-var',
+                  name: 'Amarillo',
+                  code: 'AM',
+                  isActive: true,
+                  stockStatus: 'disponible',
+                  stockQuantity: 5,
+                  price: 2500,
+                  wholesalePrice: null,
+                },
+              ],
+            },
+          ]),
+        },
+      };
+
+      const result = await validateAndPriceItems(
+        [
+          { productId: 'prod-ok-simple', quantity: 10 },
+          { productId: 'prod-ok-var', variantId: 'var-amarillo', quantity: 3 },
+        ],
+        mockTx
+      );
+
+      expect(result.validatedItems).toHaveLength(2);
+      expect(result.validatedItems[0].quantity).toBe(10);
+      expect(result.validatedItems[1].quantity).toBe(3);
+      expect(result.subtotal).toBe(10 * 1200 + 3 * 2500);
+    });
+  });
 });
+

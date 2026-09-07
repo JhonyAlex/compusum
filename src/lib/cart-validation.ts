@@ -63,6 +63,15 @@ export async function validateAndPriceItems(
     products.map((p: (typeof products)[number]) => [p.id, p])
   );
 
+  // Track aggregated requested quantities by target key to prevent overselling through split lines
+  const requestedTotalsByKey = new Map<string, number>();
+  for (const item of items) {
+    if (item.productId && typeof item.quantity === "number" && item.quantity > 0) {
+      const key = `${item.productId}:${item.variantId || ""}`;
+      requestedTotalsByKey.set(key, (requestedTotalsByKey.get(key) || 0) + item.quantity);
+    }
+  }
+
   const validatedItems: ValidatedCartItem[] = [];
 
   for (const item of items) {
@@ -128,6 +137,15 @@ export async function validateAndPriceItems(
         );
       }
 
+      // Validar inventario numérico de variante (no permitir sobreventa silenciosa)
+      const availableVariantStock = variant.stockQuantity ?? 0;
+      const totalRequested = requestedTotalsByKey.get(`${product.id}:${variant.id}`) ?? item.quantity;
+      if (totalRequested > availableVariantStock) {
+        throw new CartValidationError(
+          `No hay suficiente disponibilidad para "${product.name} (${variant.name})". Solicitado: ${totalRequested}, disponible: ${availableVariantStock}.`
+        );
+      }
+
       variantId = variant.id;
       variantName = variant.name;
       variantCode = variant.code;
@@ -138,6 +156,15 @@ export async function validateAndPriceItems(
         product.price ??
         0;
     } else {
+      // Validar inventario numérico del producto sin variante (no permitir sobreventa silenciosa)
+      const availableProductStock = product.stockQuantity ?? 0;
+      const totalRequested = requestedTotalsByKey.get(`${product.id}:`) ?? item.quantity;
+      if (totalRequested > availableProductStock) {
+        throw new CartValidationError(
+          `No hay suficiente disponibilidad para "${product.name}". Solicitado: ${totalRequested}, disponible: ${availableProductStock}.`
+        );
+      }
+
       unitPrice = product.wholesalePrice ?? product.price ?? 0;
     }
 

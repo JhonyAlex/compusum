@@ -495,3 +495,13 @@ model ProductSyncLog {
   @@index([status])
   @@index([startedAt])
 }
+
+// =====================
+// BLOQUEO CONCURRENTE DE SINCRONIZACIÓN (EXCLUSIÓN MUTUA ATÓMICA EN POSTGRESQL)
+// =====================
+model SyncLock {
+  id         String   @id
+  holderId   String
+  acquiredAt DateTime @default(now())
+  expiresAt  DateTime
+}
