@@ -72,6 +72,10 @@ export async function POST(request: NextRequest) {
     try {
       validatedResult = await validateAndPriceItems(items, db, {
         customerId: pricingCustomerId,
+        // Fase 3: el carrito (borrador) SÍ puede contener productos que
+        // requieren cotización (unitPrice null). La decisión pedido vs
+        // cotización se toma al confirmar el checkout.
+        requestType: "cotizacion",
       });
     } catch (err) {
       if (err instanceof CartValidationError) {
