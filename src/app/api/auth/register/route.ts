@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: { user: toAuthUserDTO(result.user as Record<string, unknown>) },
+        data: { user: toAuthUserDTO(result.user) },
         message: 'Cuenta creada exitosamente',
       });
     } catch (error) {

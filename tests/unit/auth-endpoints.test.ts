@@ -94,7 +94,7 @@ import { registerCustomer } from '@/lib/customer-auth';
 
 const BODY = { phone: '+57 300 123 4567', otpCode: '1234' };
 
-function jsonRequest(url: string, body: unknown): Request {
+function jsonRequest(url: string, body: unknown): any {
   return new Request(`http://localhost${url}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-session-id': 'guest-session-1' },

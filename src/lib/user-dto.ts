@@ -36,14 +36,15 @@ export interface AuthUserDTO {
  * versión pública. Ignora cualquier campo no listado, incluso si el select
  * del caller los incluyó.
  */
-export function toAuthUserDTO(user: Record<string, any> | null | undefined): AuthUserDTO | null {
-  if (!user || typeof user !== 'object' || !user.id) return null;
+export function toAuthUserDTO(user: unknown): AuthUserDTO | null {
+  if (!user || typeof user !== 'object' || !('id' in user)) return null;
 
+  const record = user as Record<string, any>;
   const dto: Record<string, unknown> = {};
   for (const field of AUTH_USER_PUBLIC_FIELDS) {
-    if (user[field] !== undefined) dto[field] = user[field];
+    if (record[field] !== undefined) dto[field] = record[field];
   }
-  return dto as AuthUserDTO;
+  return dto as unknown as AuthUserDTO;
 }
 
 /**

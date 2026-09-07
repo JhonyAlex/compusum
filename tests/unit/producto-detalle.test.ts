@@ -45,7 +45,7 @@ const PRODUCTO_CON_VARIANTES = {
   ],
 };
 
-function txFor(customer: { isActive: boolean; role: string; profile: any }) {
+function txFor(customer: { isActive: boolean; role: string; priceProfile: any }) {
   return {
     product: {
       findMany: vi.fn().mockResolvedValue([
@@ -91,11 +91,11 @@ describe('Detalle de producto: dos perfiles, con y sin variantes', () => {
   const CLIENTE_B = { isActive: true, role: 'CUSTOMER', priceProfile: null };
 
   it('Producto SIN variantes: A ve 9000 (resuelto), B ve 10000 (base)', async () => {
-    const [paraA] = await attachResolvedPrices([PRODUCTO_SIN_VARIANTE], {
+    const [paraA] = await attachResolvedPrices([PRODUCTO_SIN_VARIANTE] as any, {
       customerId: 'cust-a',
       tx: txFor(PERFI_A),
     });
-    const [paraB] = await attachResolvedPrices([PRODUCTO_SIN_VARIANTE], {
+    const [paraB] = await attachResolvedPrices([PRODUCTO_SIN_VARIANTE] as any, {
       customerId: 'cust-b',
       tx: txFor(CLIENTE_B),
     });
@@ -111,11 +111,11 @@ describe('Detalle de producto: dos perfiles, con y sin variantes', () => {
   });
 
   it('Producto CON variantes: A ve 3600/9000 y B ve 4000/10000 por variante/producto', async () => {
-    const [paraA] = await attachResolvedPrices([PRODUCTO_CON_VARIANTES], {
+    const [paraA] = await attachResolvedPrices([PRODUCTO_CON_VARIANTES] as any, {
       customerId: 'cust-a',
       tx: txFor(PERFI_A),
     });
-    const [paraB] = await attachResolvedPrices([PRODUCTO_CON_VARIANTES], {
+    const [paraB] = await attachResolvedPrices([PRODUCTO_CON_VARIANTES] as any, {
       customerId: 'cust-b',
       tx: txFor(CLIENTE_B),
     });
@@ -137,7 +137,7 @@ describe('Detalle de producto: dos perfiles, con y sin variantes', () => {
 
   it('ADMIN/AGENT o invitado => precio base en el detalle (nunca un perfil)', async () => {
     const staffTx = txFor({ isActive: true, role: 'ADMIN', priceProfile: PERFI_A.priceProfile });
-    const [paraStaff] = await attachResolvedPrices([PRODUCTO_SIN_VARIANTE], {
+    const [paraStaff] = await attachResolvedPrices([PRODUCTO_SIN_VARIANTE] as any, {
       customerId: 'admin-1',
       tx: staffTx,
     });

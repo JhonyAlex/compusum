@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 
     // Sanitizado en el borde: NUNCA exponer hash ni datos internos aunque la
     // capa de lib se regrese algún día.
-    const user = toAuthUserDTO(result.user as Record<string, unknown>);
+    const user = toAuthUserDTO(result.user);
     return NextResponse.json({
       success: true,
       data: {
