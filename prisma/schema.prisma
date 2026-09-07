@@ -537,7 +537,10 @@ model PriceProfile {
   description       String?
   percentAdjustment Float? // Ajuste porcentual general sobre el precio base (ej: -10 => -10%)
   isActive          Boolean  @default(true)
-  isDefault         Boolean  @default(false) // Perfil aplicado a clientes autenticados sin perfil asignado
+  // Informativo para uso futuro: NO participa en la resolución automática de
+  // precios (cliente sin perfil asignado => precio base). Exclusividad
+  // garantizada por índice único parcial (migración 20260907130000).
+  isDefault         Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

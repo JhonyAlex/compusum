@@ -66,6 +66,9 @@ if (!databaseUrl) {
       /^DROP\s+INDEX\s+(IF\s+EXISTS\s+)?("public"\.)?"Product_isActive_idx";?/i,
       /^DROP\s+INDEX\s+(IF\s+EXISTS\s+)?("public"\.)?"Product_isFeatured_idx";?/i,
       /^DROP\s+INDEX\s+(IF\s+EXISTS\s+)?("public"\.)?"Product_isNew_idx";?/i,
+      // Índice único parcial de exclusividad de perfil por defecto (no
+      // representable en schema.prisma; vive solo en la migración SQL).
+      /^DROP\s+INDEX\s+(IF\s+EXISTS\s+)?("public"\.)?"PriceProfile_isDefault_one_row";?/i,
     ];
 
     const lines = stdout

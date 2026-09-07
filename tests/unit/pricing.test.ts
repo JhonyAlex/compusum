@@ -98,6 +98,66 @@ describe('Pricing: resolución pura (jerarquía)', () => {
     expect(resolved.source).toBe('variant_override');
   });
 
+  // IGUALDAD: la precedencia depende de la EXISTENCIA de la regla, nunca de
+  // comparar unitPrice === base.
+  it('IGUALDAD: override variante == base => gana la variante (no lo pisa producto/ajuste)', () => {
+    // base variante = 4000, override variante = 4000, override producto = 8000, ajuste -10%
+    const { prices } = resolvePricesFromProductMap(
+      [{ productId: 'p1', variantId: 'v1' }],
+      productMap,
+      profile({ percentAdjustment: -10 }),
+      {
+        byProduct: new Map([['p1', { wholesalePrice: 8000, price: null }]]),
+        byVariant: new Map([['v1', { wholesalePrice: 4000, price: null }]]),
+      }
+    );
+    const resolved = prices.get('p1::v1')!;
+    expect(resolved.unitPrice).toBe(4000);
+    expect(resolved.source).toBe('variant_override');
+  });
+
+  it('IGUALDAD: override producto == base => gana el producto (no aplica el ajuste -10%)', () => {
+    // base producto = 10000, override producto = 10000, ajuste -10% => 10000, NO 9000
+    const { prices } = resolvePricesFromProductMap(
+      [{ productId: 'p1', variantId: null }],
+      productMap,
+      profile({ percentAdjustment: -10 }),
+      {
+        byProduct: new Map([['p1', { wholesalePrice: 10000, price: null }]]),
+        byVariant: new Map(),
+      }
+    );
+    const resolved = prices.get('p1::')!;
+    expect(resolved.unitPrice).toBe(10000);
+    expect(resolved.source).toBe('product_override');
+  });
+
+  it('IGUALDAD: ajuste 0% => la regla se considera aplicada (profile_adjustment)', () => {
+    const { prices } = resolvePricesFromProductMap(
+      [{ productId: 'p1', variantId: null }],
+      productMap,
+      profile({ percentAdjustment: 0 })
+    );
+    const resolved = prices.get('p1::')!;
+    expect(resolved.unitPrice).toBe(10000);
+    expect(resolved.source).toBe('profile_adjustment');
+  });
+
+  it('IGUALDAD: override variante == base SIN otros niveles => variant_override', () => {
+    const { prices } = resolvePricesFromProductMap(
+      [{ productId: 'p1', variantId: 'v1' }],
+      productMap,
+      profile(),
+      {
+        byProduct: new Map(),
+        byVariant: new Map([['v1', { wholesalePrice: 4000, price: null }]]),
+      }
+    );
+    const resolved = prices.get('p1::v1')!;
+    expect(resolved.unitPrice).toBe(4000);
+    expect(resolved.source).toBe('variant_override');
+  });
+
   it('precio 0 => requiere cotización / no comprable', () => {
     const { prices } = resolvePricesFromProductMap(
       [{ productId: 'p1', variantId: null }],
@@ -231,10 +291,13 @@ describe('Pricing: resolución batch con tx (sin N+1)', () => {
     expect(prices.get('p1::')!.unitPrice).toBe(10000);
   });
 
-  it('cliente sin perfil asignado recibe el perfil isDefault activo', async () => {
+  it('cliente CUSTOMER sin perfil asignado => precio base AUNQUE exista perfil isDefault activo', async () => {
+    // Política Fase 2: sin asignación explícita NO hay perfil automático.
+    // isDefault queda como dato informativo, nunca participa en la resolución.
     const tx = makeTx({
       userFindUnique: vi.fn().mockResolvedValue({
         isActive: true,
+        role: 'CUSTOMER',
         priceProfile: null,
       }),
       defaultProfile: { id: 'prof-default', code: 'DEFAULT', name: 'Default', percentAdjustment: -5 },
@@ -245,15 +308,35 @@ describe('Pricing: resolución batch con tx (sin N+1)', () => {
       { customerId: 'cust-1', tx }
     );
 
-    expect(appliedProfile?.id).toBe('prof-default');
-    expect(prices.get('p1::')!.unitPrice).toBe(9500);
-    expect(prices.get('p1::')!.source).toBe('profile_adjustment');
+    expect(appliedProfile).toBeNull();
+    expect(tx.priceProfile.findFirst).not.toHaveBeenCalled();
+    expect(prices.get('p1::')!.unitPrice).toBe(10000);
+    expect(prices.get('p1::')!.source).toBe('product_base');
+  });
+
+  it('usuario con rol interno (ADMIN) => nunca resuelve perfil comercial', async () => {
+    const tx = makeTx({
+      userFindUnique: vi.fn().mockResolvedValue({
+        isActive: true,
+        role: 'ADMIN',
+        priceProfile: { id: 'prof-1', code: 'VIP', name: 'VIP', percentAdjustment: -50, isActive: true },
+      }),
+    });
+
+    const { profile: appliedProfile, prices } = await resolvePricesForItems(
+      [{ productId: 'p1', variantId: null }],
+      { customerId: 'admin-1', tx }
+    );
+
+    expect(appliedProfile).toBeNull();
+    expect(prices.get('p1::')!.unitPrice).toBe(10000);
   });
 
   it('perfil asignado INACTIVO => fallback seguro a precio base', async () => {
     const tx = makeTx({
       userFindUnique: vi.fn().mockResolvedValue({
         isActive: true,
+        role: 'CUSTOMER',
         priceProfile: {
           id: 'prof-off',
           code: 'OFF',
@@ -279,6 +362,7 @@ describe('Pricing: resolución batch con tx (sin N+1)', () => {
     const tx = makeTx({
       userFindUnique: vi.fn().mockResolvedValue({
         isActive: false,
+        role: 'CUSTOMER',
         priceProfile: { id: 'prof-1', code: 'VIP', name: 'VIP', percentAdjustment: -50, isActive: true },
       }),
     });
@@ -294,6 +378,7 @@ describe('Pricing: resolución batch con tx (sin N+1)', () => {
     const tx = makeTx({
       userFindUnique: vi.fn().mockResolvedValue({
         isActive: true,
+        role: 'CUSTOMER',
         priceProfile: { id: 'prof-1', code: 'VIP', name: 'VIP', percentAdjustment: null, isActive: true },
       }),
       productOverrides: [{ productId: 'p1', wholesalePrice: 7500, price: null }],
@@ -357,8 +442,33 @@ describe('Pricing: SEGURIDAD — el precio del cliente solo desde sesión/acció
       tx
     );
     expect(customerId).toBe('cust-2');
+    // SOLO clientes: la búsqueda filtra explícitamente role=CUSTOMER
     expect(tx.user.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ isActive: true }) })
+      expect.objectContaining({
+        where: expect.objectContaining({
+          isActive: true,
+          role: expect.objectContaining({ equals: 'CUSTOMER' }),
+        }),
+      })
+    );
+  });
+
+  it('ADMIN con contacto que coincide con un usuario interno => NO lo resuelve (solo CUSTOMER)', async () => {
+    const tx = {
+      user: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+    const customerId = await resolveServerPricingCustomer(
+      { id: 'admin-1', role: 'admin' },
+      { phone: '3001234567' },
+      tx
+    );
+    expect(customerId).toBeNull();
+    expect(tx.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          role: expect.objectContaining({ equals: 'CUSTOMER' }),
+        }),
+      })
     );
   });
 
@@ -385,6 +495,7 @@ describe('Pricing: attachResolvedPrices para render/API', () => {
       user: {
         findUnique: vi.fn().mockResolvedValue({
           isActive: true,
+          role: 'CUSTOMER',
           priceProfile: opts.profile ?? null,
         }),
       },

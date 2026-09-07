@@ -78,17 +78,22 @@ export default function RegistrarsePage() {
                   <Input type="email" value={form.email} onChange={update("email")} placeholder="correo@empresa.com" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Teléfono</label>
+                  <label className="text-sm font-medium">Teléfono *</label>
                   <Input
                     type="tel"
                     value={form.phone}
                     onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
                     placeholder="3001234567"
+                    required
+                    pattern="[0-9]{10}"
+                    title="Número colombiano de 10 dígitos (es tu canal de recuperación de contraseña)"
                     maxLength={10}
                   />
                 </div>
               </div>
-              <p className="text-xs text-slate-500 -mt-2">Debes registrar al menos correo o teléfono.</p>
+              <p className="text-xs text-slate-500 -mt-2">
+                El teléfono es obligatorio: es tu vía para iniciar sesión y recuperar la contraseña. El correo es opcional.
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Empresa (opcional)</label>

@@ -175,12 +175,15 @@ export function CustomerFormDialog({
               <Input type="email" value={values.email ?? ""} onChange={update("email")} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Teléfono</label>
+              <label className="text-sm font-medium">Teléfono *</label>
               <Input
                 value={values.phone ?? ""}
                 onChange={(e) =>
                   setValues((p) => ({ ...p, phone: e.target.value.replace(/[^\d+]/g, "").slice(0, 15) }))
                 }
+                required
+                placeholder="3001234567"
+                title="Número colombiano de 10 dígitos: canal de inicio de sesión y recuperación por OTP"
               />
             </div>
           </div>

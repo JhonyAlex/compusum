@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { registerCustomer, CustomerAuthError } from '@/lib/customer-auth';
 import { setSessionCookie, SESSION_DURATION_HOURS_DEFAULT } from '@/lib/auth';
+import { toAuthUserDTO } from '@/lib/user-dto';
 import { checkRateLimit, recordFailedAttempt, resetRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const REGISTER_MAX_ATTEMPTS = 10;
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: { user: result.user },
+        data: { user: toAuthUserDTO(result.user as Record<string, unknown>) },
         message: 'Cuenta creada exitosamente',
       });
     } catch (error) {

@@ -81,6 +81,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const body = await request.json();
     const { items, customerName, customerEmail, customerPhone, customerCompany, cityId, notes } = body;
 
+    // Validación de forma: `items` debe ser arreglo o no venir. Un arreglo
+    // VACÍO es semánticamente "vaciar el carrito" (elimina items y subtotal 0).
+    if (items !== undefined && items !== null && !Array.isArray(items)) {
+      return NextResponse.json(
+        { success: false, error: "Formato de items inválido" },
+        { status: 400 }
+      );
+    }
+
     const existingCart = await db.cart.findUnique({ where: { uuid } });
     if (!existingCart || !existingCart.isActive) {
       return NextResponse.json(
@@ -116,7 +125,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // Motor único de precios: el precio NUNCA se toma del navegador. Se
     // recalcula server-side con el contexto del dueño del carrito (dato del
     // servidor, no del cliente); si es un carrito de invitado, precio base.
-    let validatedResult;
+    //
+    // `items: []` => VACIAR el carrito: la escritura resultante elimina TODOS
+    // los items y deja subtotal 0 (antes se dejaban los items con subtotal 0).
+    let validatedResult: Awaited<ReturnType<typeof validateAndPriceItems>> | undefined;
     if (items && Array.isArray(items) && items.length > 0) {
       let ownerPricingCustomerId: string | null = null;
       if (existingCart.userId) {
@@ -160,18 +172,19 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         cityId: cityId || null,
         notes,
         subtotal: validatedResult?.subtotal ?? 0,
-        ...(items && validatedResult
+        ...(Array.isArray(items)
           ? {
               items: {
                 deleteMany: {},
-                create: validatedResult.validatedItems.map((item) => ({
-                  productId: item.productId,
-                  variantId: item.variantId,
-                  variantName: item.variantName,
-                  variantCode: item.variantCode,
-                  quantity: item.quantity,
-                  unitPrice: item.unitPrice,
-                })),
+                create:
+                  validatedResult?.validatedItems.map((item) => ({
+                    productId: item.productId,
+                    variantId: item.variantId,
+                    variantName: item.variantName,
+                    variantCode: item.variantCode,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                  })) ?? [],
               },
             }
           : {}),

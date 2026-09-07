@@ -86,6 +86,7 @@ describe('Asignación de asesor (solo AGENT activos)', () => {
       {
         name: 'Cliente con asesor',
         email: 'conasesor@test.com',
+        phone: '3001234567',
         assignedAgentId: 'agent-1',
       },
       tx
@@ -146,31 +147,48 @@ describe('Asignación de PriceProfile', () => {
 });
 
 describe('CRUD básico del maestro', () => {
-  it('crear cliente: exige nombre y contacto', async () => {
+  it('crear cliente: exige nombre y teléfono canónico', async () => {
     const tx = makeTx();
     await expect(
-      createCustomerAccount({ name: '', email: 'a@test.com' }, tx)
+      createCustomerAccount({ name: '', email: 'a@test.com', phone: '3001234567' }, tx)
     ).rejects.toThrow('nombre es requerido');
 
+    // POLÍTICA: el teléfono es obligatorio en cuentas nuevas (recuperación por OTP)
     await expect(
-      createCustomerAccount({ name: 'Sin contacto' }, tx)
-    ).rejects.toThrow('correo o un teléfono');
+      createCustomerAccount({ name: 'Sin teléfono', email: 'b@test.com' }, tx)
+    ).rejects.toThrow('teléfono es obligatorio');
+
+    await expect(
+      createCustomerAccount({ name: 'Teléfono inválido', email: 'c@test.com', phone: '12345' }, tx)
+    ).rejects.toThrow('teléfono');
   });
 
-  it('crear cliente: rechaza duplicados', async () => {
+  it('crear cliente: rechaza duplicados (busca en variantes canónicas)', async () => {
     const tx = makeTx();
     tx.user.findFirst.mockResolvedValue({ id: 'dup' });
     await expect(
-      createCustomerAccount({ name: 'Dup', email: 'dup@test.com' }, tx)
+      createCustomerAccount({ name: 'Dup', email: 'dup@test.com', phone: '+57 300 123 4567' }, tx)
     ).rejects.toThrow('Ya existe una cuenta');
+    expect(tx.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { email: 'dup@test.com' },
+            { phone: '573001234567' },
+            { phone: '3001234567' },
+          ]),
+        }),
+      })
+    );
   });
 
-  it('crear cliente guarda datos B2B (empresa, NIT, ciudad)', async () => {
+  it('crear cliente guarda datos B2B con teléfono canónico', async () => {
     const tx = makeTx();
     await createCustomerAccount(
       {
         name: 'Distribuidora XYZ',
         email: 'xyz@test.com',
+        phone: '6063335206',
         company: 'Distribuidora XYZ S.A.S',
         taxId: '900123456-1',
         city: 'Pereira',
@@ -181,10 +199,30 @@ describe('CRUD básico del maestro', () => {
 
     const data = tx.user.create.mock.calls[0][0].data;
     expect(data.company).toBe('Distribuidora XYZ S.A.S');
+    expect(data.phone).toBe('576063335206');
     expect(data.taxId).toBe('900123456-1');
     expect(data.city).toBe('Pereira');
     expect(data.address).toBe('Calle 10 #20-30');
     expect(data.role).toBe('CUSTOMER');
+  });
+
+  it('editar cliente: no permite eliminar el teléfono ni poner uno inválido', async () => {
+    const tx = makeTx();
+    tx.user.findUnique.mockResolvedValue({
+      id: 'cust-1',
+      role: 'CUSTOMER',
+      name: 'Cliente',
+      email: 'c@test.com',
+      phone: '573001234567',
+    });
+
+    await expect(
+      updateCustomerAccount('cust-1', { phone: null, email: null }, tx)
+    ).rejects.toThrow('correo o un teléfono');
+
+    await expect(
+      updateCustomerAccount('cust-1', { phone: '123' }, tx)
+    ).rejects.toThrow('10 dígitos');
   });
 
   it('buscar clientes: el listado usa User role=CUSTOMER con búsqueda', async () => {

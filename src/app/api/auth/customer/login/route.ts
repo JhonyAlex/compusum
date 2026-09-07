@@ -7,6 +7,7 @@ import {
   rotateGuestSessionCookie,
 } from '@/lib/auth';
 import { transferSessionCartToUser, transferSessionOrderToUser } from '@/lib/order-cart-upsert';
+import { toAuthUserDTO } from '@/lib/user-dto';
 import { checkRateLimit, recordFailedAttempt, resetRateLimit, getClientIp } from '@/lib/rate-limit';
 
 type LoginMethod = 'phone' | 'password';
@@ -83,12 +84,11 @@ export async function POST(req: NextRequest) {
       await resetRateLimit(ipKey);
       if (idKey) await resetRateLimit(idKey);
 
-      // Nunca exponer el hash de contraseña en la respuesta
-      const { password: _password, ...safeUser } = result.user ?? {};
-
+      // Sanitizado en el borde (src/lib/user-dto.ts): nunca incluye hash de
+      // contraseña, passwordChangedAt ni relaciones internas.
       return NextResponse.json({
         success: true,
-        data: { user: safeUser },
+        data: { user: toAuthUserDTO(result.user as Record<string, unknown>) },
       });
     };
 

@@ -6,6 +6,7 @@ import {
   SESSION_DURATION_HOURS_DEFAULT,
   rotateGuestSessionCookie,
 } from '@/lib/auth';
+import { toAuthUserDTO } from '@/lib/user-dto';
 import { transferSessionCartToUser, transferSessionOrderToUser } from '@/lib/order-cart-upsert';
 
 export async function POST(req: Request) {
@@ -40,10 +41,13 @@ export async function POST(req: Request) {
     }
     await rotateGuestSessionCookie();
 
+    // Sanitizado en el borde: NUNCA exponer hash ni datos internos aunque la
+    // capa de lib se regrese algún día.
+    const user = toAuthUserDTO(result.user as Record<string, unknown>);
     return NextResponse.json({
       success: true,
       data: {
-        user: result.user,
+        user,
       },
     });
   } catch (error: any) {

@@ -113,7 +113,56 @@ function normalizePercent(value: number | null | undefined): number | null {
   return value;
 }
 
-export async function createPriceProfile(input: PriceProfileInput, tx: any = db) {
+/**
+ * Valida que TODOS los productos/variantes referenciados por los overrides
+ * existan, ANTES de escribir nada. Un id inválido debe abortar la operación
+ * completa sin efectos parciales.
+ */
+async function validateOverrideReferences(input: PriceProfileInput, tx: any): Promise<void> {
+  const productIds = Array.from(
+    new Set((input.productOverrides ?? []).map((o) => o.productId!).filter(Boolean))
+  );
+  const variantIds = Array.from(
+    new Set((input.variantOverrides ?? []).map((o) => o.variantId!).filter(Boolean))
+  );
+
+  if (productIds.length > 0) {
+    const found = await tx.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((p: any) => p.id));
+    const missing = productIds.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+      throw new PriceProfileAdminError(
+        "INVALID_OVERRIDE",
+        `Producto(s) inexistente(s): ${missing.join(", ")}.`
+      );
+    }
+  }
+
+  if (variantIds.length > 0) {
+    const found = await tx.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((v: any) => v.id));
+    const missing = variantIds.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+      throw new PriceProfileAdminError(
+        "INVALID_OVERRIDE",
+        `Variante(s) inexistente(s): ${missing.join(", ")}.`
+      );
+    }
+  }
+}
+
+/**
+ * Crea el perfil COMPLETO (perfil + exclusividad de default + overrides)
+ * dentro de UNA transacción. Un id de producto/variante inválido, un código
+ * duplicado o cualquier fallo intermedio aborta TODO (nada queda a medias).
+ */
+export async function createPriceProfile(input: PriceProfileInput) {
   const name = input.name?.trim().slice(0, 120);
   const code = input.code?.trim().toUpperCase().slice(0, 60);
 
@@ -121,79 +170,91 @@ export async function createPriceProfile(input: PriceProfileInput, tx: any = db)
     throw new PriceProfileAdminError("INVALID_INPUT", "Nombre y código son requeridos.");
   }
   validateOverrides(input);
-  const percentAdjustment = normalizePercent(input.percentAdjustment);
+  normalizePercent(input.percentAdjustment);
 
-  const existing = await tx.priceProfile.findUnique({ where: { code }, select: { id: true } });
-  if (existing) {
-    throw new PriceProfileAdminError("CODE_EXISTS", "Ya existe un perfil con ese código.");
-  }
-
-  const profile = await tx.priceProfile.create({
-    data: {
-      name,
-      code,
-      description: input.description?.trim().slice(0, 500) || null,
-      percentAdjustment,
-      isActive: input.isActive ?? true,
-      isDefault: input.isDefault ?? false,
-    },
-  });
-
-  if (profile.isDefault) {
-    await ensureSingleDefaultProfile(profile.id, tx);
-  }
-
-  await replaceOverrides(profile.id, input, tx);
-  return getPriceProfile(profile.id, tx);
-}
-
-export async function updatePriceProfile(id: string, input: PriceProfileInput, tx: any = db) {
-  const current = await tx.priceProfile.findUnique({ where: { id } });
-  if (!current) {
-    throw new PriceProfileAdminError("NOT_FOUND", "Perfil de precio no encontrado.");
-  }
-
-  const data: Record<string, unknown> = {};
-  if (input.name !== undefined) {
-    const name = input.name?.trim().slice(0, 120);
-    if (!name) throw new PriceProfileAdminError("INVALID_INPUT", "El nombre es requerido.");
-    data.name = name;
-  }
-  if (input.code !== undefined) {
-    const code = input.code?.trim().toUpperCase().slice(0, 60);
-    if (!code) throw new PriceProfileAdminError("INVALID_INPUT", "El código es requerido.");
+  return db.$transaction(async (tx: any) => {
     const existing = await tx.priceProfile.findUnique({ where: { code }, select: { id: true } });
-    if (existing && existing.id !== id) {
+    if (existing) {
       throw new PriceProfileAdminError("CODE_EXISTS", "Ya existe un perfil con ese código.");
     }
-    data.code = code;
-  }
-  if (input.description !== undefined) {
-    data.description = input.description?.trim().slice(0, 500) || null;
-  }
-  if (input.percentAdjustment !== undefined) {
-    data.percentAdjustment = normalizePercent(input.percentAdjustment);
-  }
-  if (input.isActive !== undefined) {
-    data.isActive = input.isActive;
-  }
-  if (input.isDefault !== undefined) {
-    data.isDefault = input.isDefault;
-  }
 
-  validateOverrides(input);
+    await validateOverrideReferences(input, tx);
 
-  const updated = await tx.priceProfile.update({ where: { id }, data });
+    const profile = await tx.priceProfile.create({
+      data: {
+        name,
+        code,
+        description: input.description?.trim().slice(0, 500) || null,
+        percentAdjustment: normalizePercent(input.percentAdjustment),
+        isActive: input.isActive ?? true,
+        isDefault: input.isDefault ?? false,
+      },
+    });
 
-  if (updated.isDefault) {
-    await ensureSingleDefaultProfile(id, tx);
-  }
+    if (profile.isDefault) {
+      await ensureSingleDefaultProfile(profile.id, tx);
+    }
 
-  if (input.productOverrides !== undefined || input.variantOverrides !== undefined) {
-    await replaceOverrides(id, input, tx);
-  }
+    await replaceOverrides(profile.id, input, tx);
+    return getPriceProfile(profile.id, tx);
+  });
+}
 
-  return getPriceProfile(id, tx);
+/**
+ * Actualiza el perfil COMPLETO (datos + exclusividad de default + overrides)
+ * dentro de UNA transacción. Un override inválido deja el perfil y sus
+ * overrides anteriores EXACTAMENTE como estaban.
+ */
+export async function updatePriceProfile(id: string, input: PriceProfileInput) {
+  return db.$transaction(async (tx: any) => {
+    const current = await tx.priceProfile.findUnique({ where: { id } });
+    if (!current) {
+      throw new PriceProfileAdminError("NOT_FOUND", "Perfil de precio no encontrado.");
+    }
+
+    const data: Record<string, unknown> = {};
+    if (input.name !== undefined) {
+      const name = input.name?.trim().slice(0, 120);
+      if (!name) throw new PriceProfileAdminError("INVALID_INPUT", "El nombre es requerido.");
+      data.name = name;
+    }
+    if (input.code !== undefined) {
+      const code = input.code?.trim().toUpperCase().slice(0, 60);
+      if (!code) throw new PriceProfileAdminError("INVALID_INPUT", "El código es requerido.");
+      const existing = await tx.priceProfile.findUnique({ where: { code }, select: { id: true } });
+      if (existing && existing.id !== id) {
+        throw new PriceProfileAdminError("CODE_EXISTS", "Ya existe un perfil con ese código.");
+      }
+      data.code = code;
+    }
+    if (input.description !== undefined) {
+      data.description = input.description?.trim().slice(0, 500) || null;
+    }
+    if (input.percentAdjustment !== undefined) {
+      data.percentAdjustment = normalizePercent(input.percentAdjustment);
+    }
+    if (input.isActive !== undefined) {
+      data.isActive = input.isActive;
+    }
+    if (input.isDefault !== undefined) {
+      data.isDefault = input.isDefault;
+    }
+
+    validateOverrides(input);
+    await validateOverrideReferences(input, tx);
+
+    const updated = await tx.priceProfile.update({ where: { id }, data });
+
+    if (updated.isDefault) {
+      await ensureSingleDefaultProfile(id, tx);
+    }
+
+    if (input.productOverrides !== undefined || input.variantOverrides !== undefined) {
+      await replaceOverrides(id, input, tx);
+    }
+
+    return getPriceProfile(id, tx);
+  });
 }
 
 /** Reemplaza el set completo de overrides del perfil (delete + create). */

@@ -41,6 +41,7 @@ function makeTx(opts: { profile?: any; productOverrides?: any[] } = {}) {
         id: 'cust-1',
         name: 'Cliente VIP',
         isActive: true,
+        role: 'CUSTOMER',
         phone: null,
         email: null,
         assignedAgentId: null,

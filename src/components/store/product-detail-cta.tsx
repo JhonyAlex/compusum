@@ -24,7 +24,10 @@ interface ProductVariantOption {
 }
 
 interface ProductDetailCTAProps {
-  product: CartProduct & { variants?: ProductVariantOption[] };
+  product: CartProduct & {
+    resolvedPrice?: ResolvedPriceView | null;
+    variants?: ProductVariantOption[];
+  };
   catalogMode?: boolean;
 }
 
@@ -44,7 +47,19 @@ export function ProductDetailCTA({ product, catalogMode = false }: ProductDetail
 
   const cartProduct = useMemo<CartProduct>(() => {
     if (!selectedVariant) {
-      return product;
+      // Sin variante: espejar el precio resuelto server-side del PRODUCTO en
+      // el CartProduct (el servidor SIEMPRE recalcula al guardar/checkout).
+      const productResolved = product.resolvedPrice;
+      const resolvedUnitPrice =
+        productResolved && !productResolved.requiresQuote && productResolved.unitPrice != null
+          ? productResolved.unitPrice
+          : null;
+
+      return {
+        ...product,
+        price: resolvedUnitPrice ?? product.price,
+        wholesalePrice: resolvedUnitPrice ?? product.wholesalePrice,
+      };
     }
 
     // Espejo del precio resuelto server-side de la variante seleccionada en

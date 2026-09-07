@@ -119,8 +119,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
     globalCatalogMode
   );
 
-  const resolvedPrice = (product as any).resolvedPrice ?? null;
-
   // Get related products
   let relatedProducts: Awaited<ReturnType<typeof db.product.findMany<{
     include: { brand: true; category: true; _count: { select: { variants: true } } };
@@ -145,7 +143,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
   }
 
   // Motor único de precios: resolvedPrice del producto, sus variantes y
-  // relacionados, según la sesión (batch, sin N+1)
+  // relacionados, según la sesión (batch, sin N+1).
+  // IMPORTANTE: capturar `resolvedPrice` DESPUÉS de attachResolvedPrices —
+  // antes de este fix se leía el valor base previo y la cabecera ignoraba el
+  // precio resuelto del perfil del cliente.
   let pricedProduct = product;
   let pricedRelated = relatedProducts;
   try {
@@ -163,6 +164,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
     console.error("Price resolution failed", error);
   }
   product = pricedProduct;
+
+  const resolvedPrice = (product as any).resolvedPrice ?? null;
 
   const stockStatusColors = {
     disponible: "bg-green-500",
@@ -381,6 +384,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     sku: product.sku,
                     price: product.price,
                     wholesalePrice: product.wholesalePrice,
+                    // Precio resuelto del PRODUCTO (sin variante): el CTA lo
+                    // usa para mostrar y para agregar al carrito.
+                    resolvedPrice: (product as any).resolvedPrice ?? null,
                     minWholesaleQty: product.minWholesaleQty,
                     stockStatus: product.stockStatus,
                     brand: product.brand ? { name: product.brand.name, slug: product.brand.slug } : null,

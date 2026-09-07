@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { canonicalColombiaPhone, phoneOrVariants } from "./phone";
 
 /**
  * MOTOR ÚNICO DE PRECIOS (server-side).
@@ -175,8 +176,14 @@ function applyProfileAdjustment(
 
 /**
  * Resuelve el perfil de precio activo del cliente.
+ *
+ * - Solo cuentas role=CUSTOMER activas tienen perfil comercial.
  * - Perfil asignado inactivo => null (fallback seguro a precio base).
- * - Sin perfil asignado => perfil activo marcado isDefault si existe.
+ * - Sin perfil asignado => null (PRECIO BASE). La Fase 2 NO aplica
+ *   automáticamente el perfil `isDefault`: los perfiles comerciales los
+ *   asigna explícitamente administración/asesor. `isDefault` queda como
+ *   dato informativo del modelo/UI para uso futuro, sin participación en
+ *   la resolución automática.
  */
 export async function getActivePriceProfile(
   customerId?: string | null,
@@ -188,6 +195,7 @@ export async function getActivePriceProfile(
     where: { id: customerId },
     select: {
       isActive: true,
+      role: true,
       priceProfile: {
         select: {
           id: true,
@@ -201,6 +209,7 @@ export async function getActivePriceProfile(
   });
 
   if (!user || !user.isActive) return null;
+  if (user.role?.toLowerCase() !== 'customer') return null;
 
   if (user.priceProfile) {
     if (!user.priceProfile.isActive) return null;
@@ -212,18 +221,22 @@ export async function getActivePriceProfile(
     };
   }
 
-  const defaultProfile = await (tx ?? db).priceProfile.findFirst({
-    where: { isDefault: true, isActive: true },
-    select: { id: true, code: true, name: true, percentAdjustment: true },
-  });
-
-  return defaultProfile ?? null;
+  return null;
 }
 
 /**
  * Resolución pura (sin I/O) a partir de productos ya cargados y del perfil.
  * Usada por la resolución batch y por `validateAndPriceItems` (que ya cargó
  * los productos para validar stock/activos).
+ *
+ * PRECEDENCIA POR EXISTENCIA DE REGLA (nunca por igualdad numérica):
+ *   1. override de variante (PriceProfileVariant)      => variant_override
+ *   2. override de producto (PriceProfileProduct)      => product_override
+ *   3. ajuste porcentual del perfil                    => profile_adjustment
+ *   4. precio base                                     => variant_base/product_base
+ * Un override cuyo valor coincide con el precio base SIGUE siendo la regla
+ * aplicada: los niveles inferiores NO se evalúan (un override == base con
+ * ajuste -10% debe devolver el valor del override, no el ajustado).
  */
 export function resolvePricesFromProductMap(
   items: PriceRequestItem[],
@@ -254,6 +267,7 @@ export function resolvePricesFromProductMap(
         byVariant: new Map<string, ProfileOverride>(),
       };
 
+      // Nivel 1: override de variante (si existe la regla, gana siempre)
       if (item.variantId) {
         const variantPrice = overridePrice(effectiveOverrides.byVariant.get(item.variantId));
         if (variantPrice !== null) {
@@ -262,7 +276,8 @@ export function resolvePricesFromProductMap(
         }
       }
 
-      if (unitPrice === base) {
+      // Nivel 2: override de producto (solo si NO se aplicó override de variante)
+      if (source !== "variant_override") {
         const productPrice = overridePrice(effectiveOverrides.byProduct.get(item.productId));
         if (productPrice !== null) {
           unitPrice = productPrice;
@@ -270,7 +285,14 @@ export function resolvePricesFromProductMap(
         }
       }
 
-      if (unitPrice === base && profile.percentAdjustment !== null && profile.percentAdjustment !== undefined && base !== null) {
+      // Nivel 3: ajuste porcentual (solo si NO se aplicó ningún override)
+      if (
+        source !== "variant_override" &&
+        source !== "product_override" &&
+        profile.percentAdjustment !== null &&
+        profile.percentAdjustment !== undefined &&
+        base !== null
+      ) {
         unitPrice = applyProfileAdjustment(base, profile);
         source = "profile_adjustment";
       }
@@ -358,7 +380,9 @@ export async function resolvePrice(
  * - Cliente autenticado con rol CUSTOMER => él mismo (sesión server-side).
  * - ADMIN/AGENT autenticado => puede resolver el cliente por el contacto del
  *   pedido (búsqueda server-side autorizada; permite vender con el precio del
- *   cliente asignado). Sin contacto válido => precio base.
+ *   cliente asignado). Sin contacto válido => precio base. La búsqueda
+ *   FILTRA EXPLÍCITAMENTE role=CUSTOMER: nunca puede resolverse un usuario
+ *   interno (admin/editor/AGENT) por coincidencia de contacto.
  * - Invitado => SIEMPRE null (precio base/default de invitado). El contacto
  *   escrito en checkout JAMÁS determina el perfil de precio.
  */
@@ -375,15 +399,17 @@ export async function resolveServerPricingCustomer(
   }
 
   if (role === "admin" || role === "editor" || role === "agent") {
-    const phone = contact?.phone?.replace(/\D/g, "") || null;
+    const phone = canonicalColombiaPhone(contact?.phone);
     const email = contact?.email?.trim().toLowerCase() || null;
     if (!phone && !email) return null;
 
     const customer = await tx.user.findFirst({
       where: {
         isActive: true,
+        // SOLO clientes: un usuario interno nunca determina precio comercial.
+        role: { equals: "CUSTOMER", mode: "insensitive" },
         OR: [
-          ...(phone ? [{ phone }] : []),
+          ...(phone ? phoneOrVariants(phone) : []),
           ...(email ? [{ email }] : []),
         ],
       },

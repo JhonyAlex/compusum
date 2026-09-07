@@ -1,7 +1,8 @@
 import { db } from "./db";
 import { hashPassword } from "./auth";
 import { Prisma } from "@prisma/client";
-import { normalizeCustomerEmail, normalizeCustomerPhone } from "./customer-auth";
+import { normalizeCustomerEmail } from "./customer-auth";
+import { canonicalColombiaPhone, phoneOrVariants } from "./phone";
 
 /**
  * Maestro de clientes sobre `User` (role CUSTOMER) — lógica compartida por
@@ -80,23 +81,36 @@ export interface CustomerInput {
   password?: string | null;
 }
 
+/**
+ * Normaliza el teléfono de entrada a formato canónico. El teléfono es
+ * OBLIGATORIO en cuentas nuevas: es el único canal de recuperación autónoma
+ * (OTP) y toda cuenta con acceso web debe poder recuperar su contraseña.
+ */
+function requireCanonicalPhone(phone?: string | null): string {
+  const canonical = canonicalColombiaPhone(phone);
+  if (!canonical) {
+    throw new CustomerAdminError(
+      "INVALID_PHONE",
+      "El teléfono es obligatorio y debe ser un número colombiano de 10 dígitos."
+    );
+  }
+  return canonical;
+}
+
 export async function createCustomerAccount(input: CustomerInput, tx: any = db) {
   const name = input.name?.trim().slice(0, 200);
   const email = normalizeCustomerEmail(input.email);
-  const phone = normalizeCustomerPhone(input.phone);
+  const phone = requireCanonicalPhone(input.phone);
 
   if (!name) {
     throw new CustomerAdminError("INVALID_NAME", "El nombre es requerido.");
-  }
-  if (!email && !phone) {
-    throw new CustomerAdminError("CONTACT_REQUIRED", "Debes registrar un correo o un teléfono.");
   }
 
   await validateAgentAssignment(input.assignedAgentId, tx);
   await validateProfileAssignment(input.priceProfileId, tx);
 
   const existing = await tx.user.findFirst({
-    where: { OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])] },
+    where: { OR: [...(email ? [{ email }] : []), ...phoneOrVariants(phone)] },
     select: { id: true },
   });
   if (existing) {
@@ -134,10 +148,13 @@ export async function createCustomerAccount(input: CustomerInput, tx: any = db) 
   }).then(stripPassword);
 }
 
-/** Nunca exponer el hash de contraseña en respuestas de la API. */
+/**
+ * Nunca exponer hash de contraseña ni marcas internas en respuestas de la
+ * API (las relaciones assignedAgent/priceProfile sí son datos del maestro).
+ */
 function stripPassword(user: any) {
   if (!user) return user;
-  const { password, ...safe } = user;
+  const { password, passwordChangedAt, sessions, ...safe } = user;
   return safe;
 }
 
@@ -166,9 +183,22 @@ export async function updateCustomerAccount(
   }
 
   const email = normalizeCustomerEmail(input.email);
-  const phone = normalizeCustomerPhone(input.phone);
+  // El teléfono NO puede eliminarse: sin teléfono la cuenta pierde su única
+  // vía de recuperación autónoma (OTP). Un teléfono inválido se rechaza.
+  let phone: string | null = null;
+  if (input.phone !== undefined && input.phone !== null) {
+    const canonical = canonicalColombiaPhone(input.phone);
+    if (!canonical) {
+      throw new CustomerAdminError(
+        "INVALID_PHONE",
+        "El teléfono debe ser un número colombiano de 10 dígitos."
+      );
+    }
+    phone = canonical;
+    data.phone = canonical;
+  }
   if (!email && !phone && input.email !== undefined && input.phone !== undefined) {
-    if (input.email === null && input.phone === null) {
+    if (input.email === null) {
       throw new CustomerAdminError(
         "CONTACT_REQUIRED",
         "El cliente debe conservar un correo o un teléfono."
@@ -176,7 +206,6 @@ export async function updateCustomerAccount(
     }
   }
   if (email !== null) data.email = email;
-  if (phone !== null) data.phone = phone;
 
   if (input.company !== undefined) data.company = input.company?.trim().slice(0, 200) || null;
   if (input.taxId !== undefined) data.taxId = input.taxId?.trim().slice(0, 50) || null;
@@ -203,13 +232,13 @@ export async function updateCustomerAccount(
     data.passwordChangedAt = new Date();
   }
 
-  // Unicidad email/teléfono excluyendo al propio cliente
+  // Unicidad email/teléfono (cualquier forma equivalente) excluyendo al propio cliente
   const nextEmail = data.email ?? current.email;
   const nextPhone = data.phone ?? current.phone;
   const duplicate = await tx.user.findFirst({
     where: {
       id: { not: id },
-      OR: [...(nextEmail ? [{ email: nextEmail }] : []), ...(nextPhone ? [{ phone: nextPhone }] : [])],
+      OR: [...(nextEmail ? [{ email: nextEmail }] : []), ...phoneOrVariants(nextPhone)],
     },
     select: { id: true },
   });

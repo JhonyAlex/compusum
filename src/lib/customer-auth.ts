@@ -1,11 +1,20 @@
 import { db } from './db';
 import { hashPassword, verifyPassword, createSession, generateToken } from './auth';
-import { sendPhoneOtp, verifyPhoneOtp } from './auth-dual';
+import { sendPhoneOtp, verifyPhoneOtp, findCustomerByPhone } from './auth-dual';
+import { canonicalColombiaPhone, phoneOrVariants } from './phone';
+import { toAuthUserDTO, AuthUserDTO } from './user-dto';
 
 /**
  * Flujos de cuenta del CLIENTE final sobre el maestro `User` (role CUSTOMER):
  * registro, cambio de contraseña y restablecimiento vía OTP (reutiliza la
  * infraestructura Twilio/mock existente; no introduce proveedores nuevos).
+ *
+ * POLÍTICA DE ACCESO (Fase 2):
+ *   - El TELÉFONO es obligatorio en cuentas self-service: es el único canal
+ *     de recuperación autónomo actual (OTP por Twilio; no hay proveedor de
+ *     email). El correo es dato adicional opcional.
+ *   - Todo teléfono se persiste canonicalizado (`src/lib/phone.ts`), de modo
+ *     que `3001234567`, `+573001234567` y `573001234567` son LA MISMA cuenta.
  */
 
 export const MIN_PASSWORD_LENGTH = 8;
@@ -26,10 +35,12 @@ export function normalizeCustomerEmail(email?: string | null): string | null {
   return normalized || null;
 }
 
+/**
+ * DEPRECATED como formato de almacenamiento: se conserva por compatibilidad
+ * con importaciones existentes. Nuevas escrituras usan `canonicalColombiaPhone`.
+ */
 export function normalizeCustomerPhone(phone?: string | null): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, '');
-  return digits.length >= 7 ? digits : null;
+  return canonicalColombiaPhone(phone);
 }
 
 function validatePasswordStrength(password: string): void {
@@ -50,7 +61,7 @@ function validatePasswordStrength(password: string): void {
 export interface RegisterCustomerInput {
   name: string;
   email?: string | null;
-  phone?: string | null;
+  phone: string | null;
   password: string;
   company?: string | null;
   taxId?: string | null;
@@ -58,24 +69,26 @@ export interface RegisterCustomerInput {
 
 /**
  * Registra una nueva cuenta CUSTOMER. Nunca reutiliza ni actualiza cuentas
- * existentes: si el email o teléfono ya existen, rechaza con error genérico
- * (evita enumeración y secuestro de cuentas creadas por checkout).
+ * existentes: si el email o teléfono ya existen (en cualquiera de sus formas
+ * equivalentes), rechaza con error genérico (evita enumeración y secuestro de
+ * cuentas creadas por checkout).
  */
 export async function registerCustomer(
   input: RegisterCustomerInput,
   sessionDurationHours = 24
-): Promise<{ token: string; user: { id: string; name: string; email: string | null; phone: string | null; role: string } }> {
+): Promise<{ token: string; user: AuthUserDTO }> {
   const name = input.name?.trim().slice(0, 200);
   const email = normalizeCustomerEmail(input.email);
-  const phone = normalizeCustomerPhone(input.phone);
+  const phone = canonicalColombiaPhone(input.phone);
 
   if (!name) {
     throw new CustomerAuthError('INVALID_NAME', 'El nombre es requerido.');
   }
-  if (!email && !phone) {
+  if (!phone) {
+    // Política de fase 2: el teléfono es obligatorio (recuperación por OTP).
     throw new CustomerAuthError(
-      'CONTACT_REQUIRED',
-      'Debes registrar un correo o un número de teléfono.'
+      'PHONE_REQUIRED',
+      'Debes registrar un número de teléfono colombiano de 10 dígitos.'
     );
   }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -84,7 +97,10 @@ export async function registerCustomer(
   validatePasswordStrength(input.password);
 
   const existing = await db.user.findFirst({
-    where: { OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])] },
+    where: {
+      role: { equals: 'CUSTOMER', mode: 'insensitive' },
+      OR: [...(email ? [{ email }] : []), ...phoneOrVariants(phone)],
+    },
     select: { id: true },
   });
 
@@ -112,7 +128,7 @@ export async function registerCustomer(
   const token = await createSession(user.id, sessionDurationHours);
   return {
     token,
-    user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+    user: toAuthUserDTO(user)!,
   };
 }
 
@@ -158,6 +174,26 @@ export async function changePassword(
   });
 }
 
+/** Busca el cliente dueño de un contacto (teléfono en cualquier forma / email). */
+async function findCustomerByContact(phoneOrEmail: string, tx: any = db) {
+  const email = normalizeCustomerEmail(phoneOrEmail);
+  const phoneVariants = phoneOrVariants(phoneOrEmail);
+
+  const orConditions = [
+    ...(email ? [{ email }] : []),
+    ...phoneVariants,
+  ];
+  if (orConditions.length === 0) return null;
+
+  return (tx ?? db).user.findFirst({
+    where: {
+      role: { equals: 'CUSTOMER', mode: 'insensitive' },
+      OR: orConditions,
+    },
+    select: { id: true, phone: true, isActive: true },
+  });
+}
+
 /**
  * Solicita restablecimiento de contraseña. Envía un OTP al teléfono del
  * usuario si existe y el proveedor está configurado. La respuesta es
@@ -167,16 +203,13 @@ export async function requestPasswordReset(
   phoneOrEmail: string
 ): Promise<{ otpSent: boolean; otpNotConfigured: boolean }> {
   const email = normalizeCustomerEmail(phoneOrEmail);
-  const phone = normalizeCustomerPhone(phoneOrEmail);
+  const phoneVariants = phoneOrVariants(phoneOrEmail);
 
-  if (!email && !phone) {
+  if (!email && phoneVariants.length === 0) {
     throw new CustomerAuthError('INVALID_CONTACT', 'Ingresa tu correo o teléfono.');
   }
 
-  const user = await db.user.findFirst({
-    where: { OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])] },
-    select: { id: true, phone: true, isActive: true },
-  });
+  const user = await findCustomerByContact(phoneOrEmail);
 
   if (!user || !user.isActive || !user.phone) {
     // Respuesta genérica: no revelar si la cuenta existe o tiene teléfono.
@@ -205,17 +238,15 @@ export async function resetPasswordWithOtp(
   validatePasswordStrength(newPassword);
 
   const email = normalizeCustomerEmail(phoneOrEmail);
-  const phone = normalizeCustomerPhone(phoneOrEmail);
+  const phoneVariants = phoneOrVariants(phoneOrEmail);
+  const lookupContact = phoneVariants[0] ?? email ?? '';
 
-  const user = await db.user.findFirst({
-    where: { OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])] },
-    select: { id: true, phone: true, isActive: true },
-  });
+  const user = await findCustomerByContact(phoneOrEmail);
 
   // Verificar OTP aunque la cuenta no exista: mismo tiempo de respuesta y
   // validación del proveedor (sin revelar existencia).
   if (!user || !user.isActive || !user.phone) {
-    await verifyPhoneOtp(phone || email || '', otpCode);
+    await verifyPhoneOtp(lookupContact, otpCode);
     throw new CustomerAuthError('INVALID_CONTACT', 'No fue posible restablecer la contraseña.');
   }
 
@@ -236,3 +267,6 @@ export async function resetPasswordWithOtp(
 export function generateResetToken(): string {
   return generateToken();
 }
+
+// Re-export para flujos administrativos que buscan por teléfono canónico.
+export { findCustomerByPhone };

@@ -281,9 +281,9 @@ export function PriceProfileDialog({ mode, profileId, triggerLabel }: PriceProfi
                 <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
                 Activo
               </label>
-              <label className="flex items-end gap-2 text-sm text-slate-700 cursor-pointer pb-2">
+              <label className="flex items-end gap-2 text-sm text-slate-700 cursor-pointer pb-2" title="Informativo para uso futuro: NO se aplica automáticamente. Los perfiles se asignan explícitamente por cliente; sin asignación el cliente ve precio base.">
                 <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
-                Por defecto
+                Por defecto (informativo)
               </label>
             </div>
 

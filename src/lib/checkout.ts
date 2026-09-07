@@ -5,6 +5,7 @@ import { validateAndPriceItems } from './cart-validation';
 import { resolveServerPricingCustomer } from './pricing';
 import { generateOrderNumber, createOrderTransactionWithRetry } from './order-number';
 import { getNextRouteDeparture } from './route-schedule';
+import { canonicalColombiaPhone, phoneOrVariants } from './phone';
 
 function generateTemporaryPassword(): string {
   const bytes = new Uint8Array(16);
@@ -12,10 +13,13 @@ function generateTemporaryPassword(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * Teléfono canónico (`src/lib/phone.ts`): `3001234567`, `+573001234567` y
+ * `573001234567` producen SIEMPRE `573001234567`. Mantiene el nombre público
+ * usado por el flujo de pedidos.
+ */
 export function normalizePhone(phone?: string | null): string | null {
-  if (!phone) return null;
-  const digitsOnly = phone.replace(/\D/g, '');
-  return digitsOnly.length >= 7 ? digitsOnly : null;
+  return canonicalColombiaPhone(phone);
 }
 
 export function normalizeEmail(email?: string | null): string | null {
@@ -23,6 +27,26 @@ export function normalizeEmail(email?: string | null): string | null {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return null;
   return normalized;
+}
+
+/** Busca un cliente por teléfono (cualquier forma almacenada) o email. */
+async function findCustomerByCheckoutContact(phone: string | null, email: string | null, tx: any) {
+  const client = tx ?? db;
+  if (phone) {
+    const byPhone = await client.user.findFirst({
+      where: {
+        role: { equals: 'CUSTOMER', mode: 'insensitive' },
+        OR: phoneOrVariants(phone),
+      },
+    });
+    if (byPhone) return byPhone;
+  }
+  if (email) {
+    return client.user.findFirst({
+      where: { role: { equals: 'CUSTOMER', mode: 'insensitive' }, email },
+    });
+  }
+  return null;
 }
 
 export async function upsertCheckoutCustomer(
@@ -42,19 +66,13 @@ export async function upsertCheckoutCustomer(
     };
   }
 
-  let customer: any = null;
-  if (phone) {
-    customer = await tx.user.findUnique({ where: { phone } });
-  }
-
-  if (!customer && email) {
-    customer = await tx.user.findUnique({ where: { email } });
-  }
+  let customer: any = await findCustomerByCheckoutContact(phone, email, tx);
 
   if (customer) {
     const updateData: Record<string, string> = {};
 
-    if (phone && !customer.phone) updateData.phone = phone;
+    // Canonicaliza teléfonos legados al completar datos (escritura idempotente)
+    if (phone && customer.phone !== phone) updateData.phone = phone;
     if (email && !customer.email) updateData.email = email;
 
     const incomingName = input.name?.trim();
@@ -98,9 +116,7 @@ export async function upsertCheckoutCustomer(
     };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const existing = phone
-        ? await tx.user.findUnique({ where: { phone } })
-        : await tx.user.findUnique({ where: { email: email! } });
+      const existing = await findCustomerByCheckoutContact(phone, email, tx);
 
       if (existing) {
         return {
