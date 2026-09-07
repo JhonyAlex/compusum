@@ -7,13 +7,19 @@ const globalForPrisma = globalThis as unknown as {
 const prismaLogLevels =
   process.env.NODE_ENV === 'production' ? ['error'] : ['query', 'warn', 'error']
 
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is not defined')
+}
+
+const databaseUrl = process.env.DATABASE_URL
+
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: prismaLogLevels,
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: databaseUrl,
       },
     },
   })

@@ -81,11 +81,11 @@ export interface ProductGroup {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function parseCurrencyClient(value?: string): number | null {
-  if (!value) return null;
-  const normalized = value.trim().replace(/[^\d.,]/g, '').replace(',', '.');
-  if (!normalized) return null;
-  const parsed = parseFloat(normalized);
+import { parseColombianPrice } from './siesa-parser';
+
+function parseCurrencyClient(value?: string | number | null): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = parseColombianPrice(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 

@@ -8,10 +8,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Upload, FileText, CheckCircle2, XCircle, AlertTriangle,
   RefreshCw, ChevronDown, ChevronUp, ArrowRight, ArrowLeft,
-  Package, Layers,
+  Package, Layers, ShieldCheck, Database, FileSpreadsheet, Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseCSV } from "@/lib/csv";
+import { isSiesaPreflightApproved } from "@/lib/siesa-preflight";
 import {
   PRODUCT_FIELDS,
   detectDefaultMapping,
@@ -46,17 +47,38 @@ interface ImportBatchResult {
   processed: number;
 }
 
+interface SiesaPreflightSummary {
+  totalRows: number;
+  uniqueReferences: number;
+  newCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  zeroPriceCount: number;
+  absentDepletedCount: number;
+  absentSampleSkus: string[];
+  errors: string[];
+}
+
+interface SiesaSyncResult {
+  syncLogId: string;
+  fileHash: string;
+  totalRows: number;
+  uniqueReferences: number;
+  createdCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  zeroPriceCount: number;
+  depletedCount: number;
+  errorCount: number;
+  errors: string[];
+  durationMs: number;
+}
+
 function hasValue(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   return String(value).trim() !== "";
 }
 
-// ─── constants ────────────────────────────────────────────────────────────────
-
-/**
- * Adaptive batching prevents saturating the backend when products have many variants.
- * Each batch stops on max product count OR max variant "weight".
- */
 const MIN_PRODUCTS_PER_BATCH = 12;
 const MAX_PRODUCTS_PER_BATCH = 28;
 const MAX_VARIANT_WEIGHT_PER_BATCH = 120;
@@ -65,7 +87,116 @@ const MAX_RETRIES_PER_BATCH = 2;
 // ─── component ────────────────────────────────────────────────────────────────
 
 export function ImportadorCSV() {
-  // ── state ─────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<"siesa" | "generic">("siesa");
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // SIESA SYNCHRONIZER STATE (Binary / Multipart / CP1252 Preserved)
+  // ═════════════════════════════════════════════════════════════════════════════
+  const [siesaFile, setSiesaFile] = useState<File | null>(null);
+  const [siesaStep, setSiesaStep] = useState<"select" | "preflight" | "syncing" | "done">("select");
+  const [siesaLoading, setSiesaLoading] = useState(false);
+  const [siesaPreflight, setSiesaPreflight] = useState<SiesaPreflightSummary | null>(null);
+  const [siesaResult, setSiesaResult] = useState<SiesaSyncResult | null>(null);
+  const [siesaReconcileAbsent, setSiesaReconcileAbsent] = useState(false);
+  const [siesaConfirmed, setSiesaConfirmed] = useState(false);
+  const [siesaError, setSiesaError] = useState<string | null>(null);
+  const [siesaIsDragging, setSiesaIsDragging] = useState(false);
+  const [siesaShowErrors, setSiesaShowErrors] = useState(false);
+  const siesaFileInputRef = useRef<HTMLInputElement>(null);
+  const siesaPreflightApproved = isSiesaPreflightApproved(siesaPreflight);
+
+  // ── Siesa Handlers ──────────────────────────────────────────────────────────
+  const handleSiesaFileSelect = async (f: File) => {
+    if (!f.name.endsWith(".csv")) {
+      setSiesaError("Solo se admiten archivos .csv de Siesa");
+      return;
+    }
+    setSiesaFile(f);
+    setSiesaError(null);
+    setSiesaPreflight(null);
+    setSiesaResult(null);
+    setSiesaConfirmed(false);
+    setSiesaLoading(true);
+
+    // Run Preflight immediately via multipart (preserving CP1252 original bytes)
+    try {
+      const formData = new FormData();
+      formData.append("file", f);
+      formData.append("action", "preflight");
+
+      const res = await fetch("/api/admin/siesa?action=preflight", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Error al analizar archivo Siesa");
+      }
+
+      setSiesaPreflight(json.data);
+      // Reconcile is allowed only if 0 errors in preflight
+      if (json.data.errors && json.data.errors.length > 0) {
+        setSiesaReconcileAbsent(false);
+      }
+      setSiesaStep("preflight");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error durante el análisis del archivo";
+      setSiesaError(msg);
+      setSiesaStep("select");
+    } finally {
+      setSiesaLoading(false);
+    }
+  };
+
+  const handleSiesaSync = async () => {
+    if (!siesaFile || !siesaConfirmed || !siesaPreflightApproved) return;
+    setSiesaLoading(true);
+    setSiesaStep("syncing");
+    setSiesaError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", siesaFile);
+      formData.append("action", "sync");
+      formData.append("reconcileAbsent", String(siesaReconcileAbsent));
+
+      const res = await fetch("/api/admin/siesa?action=sync", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Error en la sincronización Siesa");
+      }
+
+      setSiesaResult(json.data);
+      setSiesaStep("done");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error durante la sincronización";
+      setSiesaError(msg);
+      setSiesaStep("preflight");
+    } finally {
+      setSiesaLoading(false);
+    }
+  };
+
+  const resetSiesa = () => {
+    setSiesaFile(null);
+    setSiesaStep("select");
+    setSiesaPreflight(null);
+    setSiesaResult(null);
+    setSiesaConfirmed(false);
+    setSiesaError(null);
+    setSiesaLoading(false);
+    setSiesaReconcileAbsent(false);
+    if (siesaFileInputRef.current) siesaFileInputRef.current.value = "";
+  };
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // GENERIC CSV IMPORT STATE (Legacy manual column mapping)
+  // ═════════════════════════════════════════════════════════════════════════════
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
@@ -88,13 +219,11 @@ export function ImportadorCSV() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(false);
 
-  // ── derived: grouped products (computed when on preview/importing) ─────
   const groupResult: GroupResult | null = useMemo(() => {
     if (rows.length === 0 || !mapping.reference) return null;
     return groupRowsIntoProducts(rows, mapping, skipGeneric, skipNoSubir);
   }, [rows, mapping, skipGeneric, skipNoSubir]);
 
-  // ── mapping validation ────────────────────────────────────────────────────
   const mappingValid = useMemo(() => {
     const requiredFields = PRODUCT_FIELDS.filter((f) => f.required);
     return requiredFields.every((f) => mapping[f.key]);
@@ -106,26 +235,18 @@ export function ImportadorCSV() {
     const critical: string[] = [];
     const warnings: string[] = [];
 
-    if (!mappingValid) {
-      critical.push("Faltan campos obligatorios en el mapeo.");
-    }
-    if (groupResult.products.length === 0) {
-      critical.push("No hay productos válidos para importar.");
-    }
+    if (!mappingValid) critical.push("Faltan campos obligatorios en el mapeo.");
+    if (groupResult.products.length === 0) critical.push("No hay productos válidos para importar.");
 
     const productsWithoutVariants = groupResult.products.filter((p) => p.variants.length === 0).length;
-    if (productsWithoutVariants > 0) {
-      warnings.push(`${productsWithoutVariants} producto(s) quedarán sin variaciones.`);
-    }
+    if (productsWithoutVariants > 0) warnings.push(`${productsWithoutVariants} producto(s) quedarán sin variaciones.`);
 
     const productsWithoutPrice = groupResult.products.filter((p) => {
       const hasProductPrice = hasValue(p.price);
       const hasVariantPrice = p.variants.some((v) => hasValue(v.price));
       return !hasProductPrice && !hasVariantPrice;
     }).length;
-    if (productsWithoutPrice > 0) {
-      warnings.push(`${productsWithoutPrice} producto(s) no tienen precio en CSV.`);
-    }
+    if (productsWithoutPrice > 0) warnings.push(`${productsWithoutPrice} producto(s) no tienen precio en CSV.`);
 
     if (groupResult.errors.length > 0) {
       warnings.push(`Se detectaron ${groupResult.errors.length} advertencias en el agrupado.`);
@@ -136,28 +257,23 @@ export function ImportadorCSV() {
 
   const canStartImport = useMemo(() => {
     return Boolean(
-      groupResult
-      && preflightReport
-      && preflightRun
-      && preflightAccepted
-      && preflightReport.critical.length === 0,
+      groupResult &&
+      preflightReport &&
+      preflightRun &&
+      preflightAccepted &&
+      preflightReport.critical.length === 0
     );
   }, [groupResult, preflightReport, preflightRun, preflightAccepted]);
 
   useEffect(() => {
-    // If source data or mapping changes, preflight must run again from scratch.
     setPreflightRun(false);
     setPreflightAccepted(false);
   }, [mapping, rows]);
 
   useEffect(() => {
-    // Option tweaks can change outcomes; keep report visible but require a fresh confirmation.
-    if (preflightRun) {
-      setPreflightAccepted(false);
-    }
+    if (preflightRun) setPreflightAccepted(false);
   }, [duplicateMode, skipGeneric, skipNoSubir, preflightRun]);
 
-  // ── file handling ─────────────────────────────────────────────────────────
   const handleFile = useCallback(async (f: File) => {
     if (!f.name.endsWith(".csv")) {
       setParseError("Solo se admiten archivos .csv");
@@ -178,26 +294,11 @@ export function ImportadorCSV() {
     setCsvHeaders(headers);
     setRows(parsed);
 
-    // Auto-detect mapping
     const detected = detectDefaultMapping(headers);
     setMapping(detected);
     setStep("mapping");
   }, []);
 
-  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) handleFile(f);
-    e.target.value = "";
-  };
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
-  };
-
-  // ── mapping update ────────────────────────────────────────────────────────
   const updateMapping = (fieldKey: ProductFieldKey, csvColumn: string) => {
     setMapping((prev) => {
       const next = { ...prev };
@@ -210,7 +311,6 @@ export function ImportadorCSV() {
     });
   };
 
-  // ── import ────────────────────────────────────────────────────────────────
   const buildAdaptiveBatches = (products: GroupResult["products"]) => {
     const batches: GroupResult["products"][] = [];
     let current: GroupResult["products"] = [];
@@ -232,10 +332,7 @@ export function ImportadorCSV() {
       currentWeight += productWeight;
     }
 
-    if (current.length > 0) {
-      batches.push(current);
-    }
-
+    if (current.length > 0) batches.push(current);
     return batches;
   };
 
@@ -315,7 +412,6 @@ export function ImportadorCSV() {
       setProcessedBatches(i + 1);
       setProgress(Math.round((processed / products.length) * 100));
 
-      // Yield to the browser to keep UI updates responsive during long imports.
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
@@ -324,7 +420,7 @@ export function ImportadorCSV() {
     setStep("done");
   };
 
-  const reset = () => {
+  const resetGeneric = () => {
     setStep("upload");
     setFile(null);
     setRows([]);
@@ -343,7 +439,6 @@ export function ImportadorCSV() {
     abortRef.current = false;
   };
 
-  // ─── Step badge ──────────────────────────────────────────────────────────
   const StepBadge = ({ n, active }: { n: number; active: boolean }) => (
     <span className={cn(
       "w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold shrink-0",
@@ -353,441 +448,611 @@ export function ImportadorCSV() {
     </span>
   );
 
-  // ─── Render ──────────────────────────────────────────────────────────────
-
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-3xl">
-
-      {/* ── Step 1: Upload CSV ───────────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <StepBadge n={1} active={step === "upload"} />
-            Subir archivo CSV
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {step === "upload" ? (
-            <>
-              <div
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={onDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={cn(
-                  "border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors",
-                  isDragging ? "border-blue-400 bg-blue-50"
-                    : parseError ? "border-red-300 bg-red-50"
-                    : "border-slate-300 hover:border-blue-400 hover:bg-slate-50",
-                )}
-              >
-                <Upload className={cn("h-10 w-10 mx-auto mb-3", parseError ? "text-red-400" : "text-slate-400")} />
-                <p className="font-medium text-slate-700">
-                  Arrastra tu CSV aquí o haz clic para elegir
-                </p>
-                <p className="text-sm text-slate-400 mt-1">Solo archivos .csv</p>
-                <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={onInputChange} />
-              </div>
-              {parseError && (
-                <Alert variant="destructive" className="mt-4">
-                  <XCircle className="h-4 w-4" />
-                  <AlertDescription>{parseError}</AlertDescription>
-                </Alert>
-              )}
-            </>
-          ) : (
-            <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
-              <FileText className="h-8 w-8 text-blue-500 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-slate-900 truncate">{file?.name}</p>
-                <p className="text-sm text-slate-500">{rows.length} filas · {csvHeaders.length} columnas detectadas</p>
-              </div>
-              {step !== "importing" && (
-                <Button variant="ghost" size="sm" onClick={reset}>Cambiar</Button>
-              )}
-            </div>
+    <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
+      {/* ── Mode Switcher Tab Bar ────────────────────────────────────────── */}
+      <div className="flex border-b border-slate-200 pb-2 gap-4">
+        <button
+          type="button"
+          onClick={() => setActiveTab("siesa")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors border-b-2",
+            activeTab === "siesa"
+              ? "border-blue-600 text-blue-600 bg-blue-50/50"
+              : "border-transparent text-slate-500 hover:text-slate-800",
           )}
-        </CardContent>
-      </Card>
+        >
+          <Database className="h-4 w-4" />
+          Sincronizador Siesa ERP
+          <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">
+            Oficial
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("generic")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors border-b-2",
+            activeTab === "generic"
+              ? "border-blue-600 text-blue-600 bg-blue-50/50"
+              : "border-transparent text-slate-500 hover:text-slate-800",
+          )}
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          Importador CSV Estándar (Manual)
+        </button>
+      </div>
 
-      {/* ── Step 2: Field Mapping ────────────────────────────────────────── */}
-      {step !== "upload" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <StepBadge n={2} active={step === "mapping"} />
-              Mapeo de campos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {step === "mapping" ? (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-500">
-                  Relaciona las columnas de tu CSV con los campos de producto. Los campos marcados con * son obligatorios.
-                </p>
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* TAB 1: SIESA SYNCHRONIZER                                           */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "siesa" && (
+        <div className="space-y-6">
+          {/* Card: File Selection & Preflight */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-blue-600" />
+                  Sincronización Automática con Productos.csv (Siesa)
+                </span>
+                <span className="text-xs font-normal text-slate-400">
+                  Lectura binaria segura · CP1252 intacto · Bloqueo atómico PostgreSQL
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {siesaStep === "select" ? (
+                <>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setSiesaIsDragging(true); }}
+                    onDragLeave={() => setSiesaIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setSiesaIsDragging(false);
+                      const f = e.dataTransfer.files[0];
+                      if (f) handleSiesaFileSelect(f);
+                    }}
+                    onClick={() => siesaFileInputRef.current?.click()}
+                    className={cn(
+                      "border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors",
+                      siesaIsDragging ? "border-blue-500 bg-blue-50"
+                        : siesaError ? "border-red-300 bg-red-50"
+                        : "border-slate-300 hover:border-blue-400 hover:bg-slate-50",
+                    )}
+                  >
+                    <Upload className={cn("h-10 w-10 mx-auto mb-3", siesaError ? "text-red-400" : "text-blue-500")} />
+                    <p className="font-medium text-slate-700">
+                      Selecciona o arrastra el archivo <span className="font-mono text-blue-700">Productos.csv</span>
+                    </p>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Exportación directa de Siesa en codificación CP1252 / Windows-1252
+                    </p>
+                    <input
+                      ref={siesaFileInputRef}
+                      type="file"
+                      accept=".csv"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleSiesaFileSelect(f);
+                      }}
+                    />
+                  </div>
 
-                <div className="space-y-3">
-                  {PRODUCT_FIELDS.map((field) => {
-                    const currentValue = mapping[field.key] ?? "";
-                    return (
-                      <div key={field.key} className="grid grid-cols-[1fr,auto,1fr] gap-3 items-center">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">
-                            {field.label} {field.required && <span className="text-red-500">*</span>}
-                          </p>
-                          <p className="text-xs text-slate-400">{field.description}</p>
-                        </div>
-                        <ArrowRight className="h-4 w-4 text-slate-300 shrink-0" />
-                        <select
-                          value={currentValue}
-                          onChange={(e) => updateMapping(field.key, e.target.value)}
-                          className={cn(
-                            "w-full rounded-md border px-3 py-2 text-sm bg-white",
-                            field.required && !currentValue
-                              ? "border-red-300 focus:ring-red-500"
-                              : "border-slate-200 focus:ring-blue-500",
-                          )}
-                        >
-                          <option value="">— No mapear —</option>
-                          {csvHeaders.map((h) => (
-                            <option key={h} value={h}>{h}</option>
-                          ))}
-                        </select>
-                      </div>
-                    );
-                  })}
-                </div>
+                  {siesaLoading && (
+                    <div className="flex items-center justify-center gap-3 p-6 text-sm text-blue-600">
+                      <RefreshCw className="h-5 w-5 animate-spin" />
+                      Analizando archivo Siesa y ejecutando preflight contra la base de datos…
+                    </div>
+                  )}
 
-                {/* Sample data preview */}
-                {mapping.reference && rows.length > 0 && (
-                  <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-                    <p className="text-xs font-medium text-slate-500 mb-2">Vista previa (primera fila):</p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                      {PRODUCT_FIELDS.filter((f) => mapping[f.key]).map((f) => (
-                        <div key={f.key} className="flex gap-1">
-                          <span className="text-slate-400">{f.label}:</span>
-                          <span className="text-slate-700 font-medium truncate">
-                            {rows[0][mapping[f.key]!] || "—"}
-                          </span>
-                        </div>
-                      ))}
+                  {siesaError && (
+                    <Alert variant="destructive" className="mt-4">
+                      <XCircle className="h-4 w-4" />
+                      <AlertDescription>{siesaError}</AlertDescription>
+                    </Alert>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-8 w-8 text-blue-600 shrink-0" />
+                    <div>
+                      <p className="font-medium text-slate-900">{siesaFile?.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {siesaFile ? `${(siesaFile.size / 1024).toFixed(1)} KB` : ""} · Formato Siesa verificado
+                      </p>
                     </div>
                   </div>
-                )}
-
-                <div className="flex justify-end pt-2">
-                  <Button onClick={() => setStep("preview")} disabled={!mappingValid}>
-                    Continuar <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">
-                {Object.keys(mapping).length} campos mapeados
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Step 3: Preview & Configure ──────────────────────────────────── */}
-      {(step === "preview" || step === "importing" || step === "done") && groupResult && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <StepBadge n={3} active={step === "preview"} />
-              Vista previa e importación
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                <Package className="h-5 w-5 text-blue-600 mx-auto mb-1" />
-                <p className="text-xl font-bold text-blue-700">{groupResult.stats.uniqueProducts}</p>
-                <p className="text-xs text-blue-600">Productos</p>
-              </div>
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-center">
-                <Layers className="h-5 w-5 text-purple-600 mx-auto mb-1" />
-                <p className="text-xl font-bold text-purple-700">{groupResult.stats.totalVariants}</p>
-                <p className="text-xs text-purple-600">Variaciones</p>
-              </div>
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-slate-700">{groupResult.stats.productsWithVariants}</p>
-                <p className="text-xs text-slate-500">Con variaciones</p>
-              </div>
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-slate-700">{groupResult.stats.totalRows}</p>
-                <p className="text-xs text-slate-500">Filas CSV</p>
-              </div>
-            </div>
-
-            {/* Grouping errors */}
-            {groupResult.errors.length > 0 && (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <p className="font-medium mb-1">{groupResult.errors.length} advertencia{groupResult.errors.length !== 1 ? "s" : ""} al agrupar:</p>
-                  <ul className="text-xs space-y-0.5 list-disc list-inside max-h-24 overflow-y-auto">
-                    {groupResult.errors.slice(0, 10).map((e, i) => <li key={i}>{e}</li>)}
-                    {groupResult.errors.length > 10 && (
-                      <li className="text-slate-400">…y {groupResult.errors.length - 10} más</li>
-                    )}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {step === "preview" && (
-              <>
-                {/* Options */}
-                <div className="space-y-3 pt-2">
-                  <p className="text-sm font-medium text-slate-700">Opciones de importación</p>
-
-                  {/* Duplicate mode */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setDuplicateMode("skip")}
-                      className={cn(
-                        "text-left p-3 rounded-lg border-2 transition-colors",
-                        duplicateMode === "skip" ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300",
-                      )}
-                    >
-                      <p className="font-medium text-sm text-slate-900">Ignorar duplicados</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Si el SKU ya existe, no lo modifica.
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDuplicateMode("update")}
-                      className={cn(
-                        "text-left p-3 rounded-lg border-2 transition-colors",
-                        duplicateMode === "update" ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-300",
-                      )}
-                    >
-                      <p className="font-medium text-sm text-slate-900">Actualizar duplicados</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Sobreescribe datos si el SKU ya existe.
-                      </p>
-                    </button>
-                  </div>
-
-                  {/* Skip generic */}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={skipGeneric}
-                      onChange={(e) => setSkipGeneric(e.target.checked)}
-                      className="rounded border-slate-300"
-                    />
-                    <span className="text-sm text-slate-700">
-                      Omitir variación "Genérico" en productos con una sola fila
-                    </span>
-                  </label>
-
-                  {/* Skip No subir */}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={skipNoSubir}
-                      onChange={(e) => setSkipNoSubir(e.target.checked)}
-                      className="rounded border-slate-300"
-                    />
-                    <span className="text-sm text-slate-700">
-                      Omitir variación "No subir" en productos con una sola fila
-                    </span>
-                  </label>
-                </div>
-
-                {/* Mandatory preflight validation */}
-                <div className="pt-3 space-y-3 border-t border-slate-200">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-slate-700">
-                      Validación previa obligatoria
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setPreflightRun(true)}
-                    >
-                      Ejecutar validación
+                  {siesaStep !== "syncing" && (
+                    <Button variant="ghost" size="sm" onClick={resetSiesa}>
+                      Cambiar archivo
                     </Button>
-                  </div>
-
-                  {!preflightRun && (
-                    <p className="text-xs text-slate-500">
-                      Ejecuta la validación para habilitar la importación.
-                    </p>
-                  )}
-
-                  {preflightRun && preflightReport && (
-                    <div className="space-y-2 text-sm">
-                      <div className={cn(
-                        "rounded-lg border p-3",
-                        preflightReport.critical.length === 0
-                          ? "border-green-200 bg-green-50"
-                          : "border-red-200 bg-red-50",
-                      )}>
-                        <p className="font-medium">
-                          {preflightReport.critical.length === 0
-                            ? "Validación crítica aprobada"
-                            : "Se encontraron bloqueos críticos"}
-                        </p>
-                        {preflightReport.critical.length > 0 && (
-                          <ul className="mt-1 list-disc list-inside text-xs">
-                            {preflightReport.critical.map((msg, i) => <li key={i}>{msg}</li>)}
-                          </ul>
-                        )}
-                      </div>
-
-                      {preflightReport.warnings.length > 0 && (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                          <p className="font-medium text-amber-800">Advertencias de validación</p>
-                          <ul className="mt-1 list-disc list-inside text-xs text-amber-700">
-                            {preflightReport.warnings.map((msg, i) => <li key={i}>{msg}</li>)}
-                          </ul>
-                        </div>
-                      )}
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={preflightAccepted}
-                          onChange={(e) => setPreflightAccepted(e.target.checked)}
-                          className="rounded border-slate-300"
-                          disabled={preflightReport.critical.length > 0}
-                        />
-                        <span className="text-xs text-slate-700">
-                          Confirmo que revisé la validación y autorizo iniciar la importación.
-                        </span>
-                      </label>
-                    </div>
                   )}
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
-                {/* Sample products */}
-                <div className="pt-2">
-                  <p className="text-xs font-medium text-slate-500 mb-2">Muestra de productos agrupados:</p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {groupResult.products.slice(0, 5).map((p) => (
-                      <div key={p.reference} className="flex items-start gap-2 p-2 bg-slate-50 rounded text-xs">
-                        <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-mono shrink-0">
-                          {p.reference}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-700 truncate">{p.name}</p>
-                          {p.variants.length > 0 && (
-                            <p className="text-slate-400">
-                              {p.variants.length} variación{p.variants.length !== 1 ? "es" : ""}:
-                              {" "}{p.variants.slice(0, 4).map((v) => v.name).join(", ")}
-                              {p.variants.length > 4 && ` …+${p.variants.length - 4}`}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {groupResult.products.length > 5 && (
-                      <p className="text-xs text-slate-400 text-center">
-                        …y {groupResult.products.length - 5} productos más
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-3 pt-2">
-                  <Button variant="outline" onClick={() => setStep("mapping")}>
-                    <ArrowLeft className="h-4 w-4 mr-1" /> Volver al mapeo
-                  </Button>
-                  <Button onClick={startImport} className="flex-1" disabled={!canStartImport}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Importar {groupResult.stats.uniqueProducts} productos
-                  </Button>
-                </div>
-              </>
-            )}
-
-            {/* Importing progress */}
-            {step === "importing" && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
-                  <span>Procesando… {progress}%</span>
-                </div>
-                <Progress value={progress} className="h-3" />
-                <p className="text-xs text-slate-400">
-                  Progreso real: {processedProducts} / {groupResult.stats.uniqueProducts} productos procesados
-                  · lote {Math.max(processedBatches, 1)} de {Math.max(totalBatches, 1)}.
-                </p>
-              </div>
-            )}
-
-            {/* Done */}
-            {step === "done" && result && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                    <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto mb-1" />
-                    <p className="text-2xl font-bold text-green-700">{result.created}</p>
-                    <p className="text-xs text-green-600">Creados</p>
+          {/* Preflight Report Card */}
+          {(siesaStep === "preflight" || siesaStep === "syncing") && siesaPreflight && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>Resultado del Preflight (Análisis previo no mutante)</span>
+                  {siesaPreflightApproved ? (
+                    <span className="text-xs px-2.5 py-1 rounded bg-green-100 text-green-700 font-semibold">
+                      Preflight Aprobado
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2.5 py-1 rounded bg-red-100 text-red-700 font-semibold">
+                      Preflight Rechazado
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-slate-500 mb-1">Filas en CSV</p>
+                    <p className="text-2xl font-bold text-slate-800">{siesaPreflight.totalRows.toLocaleString()}</p>
                   </div>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                    <RefreshCw className="h-5 w-5 text-blue-600 mx-auto mb-1" />
-                    <p className="text-2xl font-bold text-blue-700">{result.updated}</p>
-                    <p className="text-xs text-blue-600">Actualizados</p>
+                    <p className="text-xs text-blue-600 mb-1">Referencias Únicas</p>
+                    <p className="text-2xl font-bold text-blue-700">{siesaPreflight.uniqueReferences.toLocaleString()}</p>
                   </div>
-                  <div className={cn(
-                    "rounded-lg p-3 text-center border",
-                    importErrors.length > 0
-                      ? "bg-red-50 border-red-200"
-                      : "bg-slate-50 border-slate-200",
-                  )}>
-                    {importErrors.length > 0
-                      ? <AlertTriangle className="h-5 w-5 text-red-500 mx-auto mb-1" />
-                      : <CheckCircle2 className="h-5 w-5 text-slate-400 mx-auto mb-1" />
-                    }
-                    <p className={cn("text-2xl font-bold", importErrors.length > 0 ? "text-red-700" : "text-slate-500")}>
-                      {importErrors.length}
-                    </p>
-                    <p className={cn("text-xs", importErrors.length > 0 ? "text-red-600" : "text-slate-400")}>
-                      Con error
-                    </p>
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-emerald-600 mb-1">Nuevas Referencias</p>
+                    <p className="text-2xl font-bold text-emerald-700">{siesaPreflight.newCount.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-purple-600 mb-1">Por Actualizar</p>
+                    <p className="text-2xl font-bold text-purple-700">{siesaPreflight.updatedCount.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-slate-500 mb-1">Sin Cambios</p>
+                    <p className="text-2xl font-bold text-slate-600">{siesaPreflight.unchangedCount.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-amber-700 mb-1">Precio COP 0</p>
+                    <p className="text-2xl font-bold text-amber-700">{siesaPreflight.zeroPriceCount.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center sm:col-span-2">
+                    <p className="text-xs text-orange-700 mb-1">Ausentes en CSV con stock actual</p>
+                    <p className="text-2xl font-bold text-orange-700">{siesaPreflight.absentDepletedCount.toLocaleString()}</p>
                   </div>
                 </div>
 
-                {result.skipped > 0 && (
-                  <p className="text-sm text-slate-500 text-center">
-                    {result.skipped} producto{result.skipped !== 1 ? "s omitidos" : " omitido"} (SKU duplicado)
-                  </p>
+                {/* Price 0 Alert */}
+                {siesaPreflight.zeroPriceCount > 0 && (
+                  <Alert className="bg-amber-50/70 border-amber-200 text-amber-900">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs">
+                      <strong>Protección COP 0 activa:</strong> Se detectaron {siesaPreflight.zeroPriceCount} referencias con precio $0,00.
+                      Estos productos se importarán pero requerirán cotización; el sistema rechaza automáticamente cualquier intento de compra a COP 0.
+                    </AlertDescription>
+                  </Alert>
                 )}
 
-                {importErrors.length > 0 && (
+                {/* Errors Alert */}
+                {siesaPreflight.errors.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      <p className="font-semibold mb-1">
+                        Se detectaron {siesaPreflight.errors.length} errores de formato/parser en el archivo:
+                      </p>
+                      <ul className="list-disc list-inside space-y-0.5 max-h-24 overflow-y-auto">
+                        {siesaPreflight.errors.slice(0, 5).map((err, i) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 font-medium">
+                        Por seguridad de datos, la sincronización completa ha sido bloqueada hasta corregir el archivo.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Confirmation & Reconcile Options */}
+                {siesaStep === "preflight" && (
+                  <div className="pt-4 border-t border-slate-200 space-y-4">
+                    <label className={cn("flex items-start gap-3 p-3 rounded-lg border cursor-pointer",
+                      siesaPreflight.errors.length > 0 ? "bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed" : "bg-slate-50/70 border-slate-200 hover:bg-slate-100/50"
+                    )}>
+                      <input
+                        type="checkbox"
+                        checked={siesaReconcileAbsent}
+                        onChange={(e) => setSiesaReconcileAbsent(e.target.checked)}
+                        disabled={siesaPreflight.errors.length > 0}
+                        className="mt-0.5 rounded border-slate-300"
+                      />
+                      <div className="text-xs text-slate-700">
+                        <span className="font-medium">Reconciliar referencias ausentes:</span> Marcar con stock 0 y estado agotado
+                        los productos Siesa que no aparecen en este archivo ({siesaPreflight.absentDepletedCount} productos identificados).
+                        {siesaPreflight.errors.length > 0 && (
+                          <p className="text-red-500 font-semibold mt-0.5">
+                            Inhabilitado porque el archivo contiene errores estructurales.
+                          </p>
+                        )}
+                      </div>
+                    </label>
+
+                    <label className={cn(
+                      "flex items-start gap-3 p-3 rounded-lg border",
+                      siesaPreflightApproved
+                        ? "border-blue-200 bg-blue-50/50 cursor-pointer"
+                        : "border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed"
+                    )}>
+                      <input
+                        type="checkbox"
+                        checked={siesaConfirmed}
+                        onChange={(e) => setSiesaConfirmed(e.target.checked)}
+                        disabled={!siesaPreflightApproved}
+                        className="mt-0.5 rounded border-blue-400"
+                      />
+                      <div className="text-xs text-slate-800">
+                        <span className="font-semibold">Confirmación obligatoria:</span> He revisado el preflight y autorizo
+                        la sincronización de {siesaPreflight.uniqueReferences.toLocaleString()} referencias en el catálogo oficial de Compusum.
+                      </div>
+                    </label>
+
+                    {siesaError && (
+                      <Alert variant="destructive">
+                        <XCircle className="h-4 w-4" />
+                        <AlertDescription className="text-xs">{siesaError}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <Button variant="outline" onClick={resetSiesa}>
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleSiesaSync}
+                        disabled={!siesaPreflightApproved || !siesaConfirmed || siesaLoading}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Lock className="h-4 w-4 mr-2" />
+                        Iniciar Sincronización Siesa
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Syncing Progress */}
+                {siesaStep === "syncing" && (
+                  <div className="py-6 text-center space-y-3">
+                    <RefreshCw className="h-8 w-8 text-blue-600 animate-spin mx-auto" />
+                    <p className="font-medium text-slate-800">Sincronizando catálogo con Siesa…</p>
+                    <p className="text-xs text-slate-500">
+                      Exclusión mutua activa en PostgreSQL. Procesando {siesaPreflight.uniqueReferences.toLocaleString()} referencias en lotes transaccionales.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Siesa Completed Result & Audit Card */}
+          {siesaStep === "done" && siesaResult && (
+            <Card className="border-green-200 bg-green-50/20">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2 text-green-700">
+                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                  Sincronización Siesa Completada y Auditada
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-2 text-xs">
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-slate-500">ID de Auditoría:</span>
+                    <span className="font-mono font-medium text-slate-800">{siesaResult.syncLogId}</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-slate-500">Hash SHA-256 del archivo:</span>
+                    <span className="font-mono text-slate-700 truncate max-w-xs">{siesaResult.fileHash}</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-slate-500">Tiempo de ejecución:</span>
+                    <span className="font-medium text-slate-800">{(siesaResult.durationMs / 1000).toFixed(2)} segundos</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-green-700">Creadas</p>
+                    <p className="text-2xl font-bold text-green-800">{siesaResult.createdCount.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-blue-700">Actualizadas</p>
+                    <p className="text-2xl font-bold text-blue-800">{siesaResult.updatedCount.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-slate-500">Sin cambios</p>
+                    <p className="text-2xl font-bold text-slate-700">{siesaResult.unchangedCount.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
+                    <p className="text-xs text-orange-700">Ausentes agotadas</p>
+                    <p className="text-2xl font-bold text-orange-800">{siesaResult.depletedCount.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                {siesaResult.errorCount > 0 && (
                   <div>
                     <button
                       type="button"
-                      onClick={() => setShowErrors(!showErrors)}
-                      className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700 font-medium"
+                      onClick={() => setSiesaShowErrors(!siesaShowErrors)}
+                      className="flex items-center gap-1 text-xs text-amber-700 font-semibold"
                     >
-                      {showErrors ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      Ver detalle de errores ({importErrors.length})
+                      {siesaShowErrors ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      Advertencias registradas ({siesaResult.errorCount})
                     </button>
-                    {showErrors && (
-                      <ul className="mt-2 space-y-1 text-xs text-red-600 bg-red-50 rounded-lg p-3 max-h-48 overflow-y-auto">
-                        {importErrors.map((e, i) => <li key={i}>{e}</li>)}
+                    {siesaShowErrors && (
+                      <ul className="mt-2 text-xs bg-amber-50 text-amber-900 rounded p-3 space-y-1 max-h-32 overflow-y-auto">
+                        {siesaResult.errors.map((e, idx) => (
+                          <li key={idx}>{e}</li>
+                        ))}
                       </ul>
                     )}
                   </div>
                 )}
 
-                <Button variant="outline" onClick={reset} className="w-full">
-                  Importar otro archivo
+                <Button onClick={resetSiesa} className="w-full bg-slate-800 hover:bg-slate-900 text-white">
+                  Sincronizar otro archivo
                 </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* TAB 2: GENERIC MANUAL CSV IMPORTER (LEGACY)                         */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "generic" && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <StepBadge n={1} active={step === "upload"} />
+                Subir archivo CSV Genérico
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {step === "upload" ? (
+                <>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const f = e.dataTransfer.files[0];
+                      if (f) handleFile(f);
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={cn(
+                      "border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors",
+                      isDragging ? "border-blue-400 bg-blue-50"
+                        : parseError ? "border-red-300 bg-red-50"
+                        : "border-slate-300 hover:border-blue-400 hover:bg-slate-50",
+                    )}
+                  >
+                    <Upload className={cn("h-10 w-10 mx-auto mb-3", parseError ? "text-red-400" : "text-slate-400")} />
+                    <p className="font-medium text-slate-700">Arrastra tu CSV aquí o haz clic para elegir</p>
+                    <p className="text-sm text-slate-400 mt-1">Solo archivos .csv</p>
+                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleFile(f);
+                      e.target.value = "";
+                    }} />
+                  </div>
+                  {parseError && (
+                    <Alert variant="destructive" className="mt-4">
+                      <XCircle className="h-4 w-4" />
+                      <AlertDescription>{parseError}</AlertDescription>
+                    </Alert>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
+                  <FileText className="h-8 w-8 text-blue-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-900 truncate">{file?.name}</p>
+                    <p className="text-sm text-slate-500">{rows.length} filas · {csvHeaders.length} columnas detectadas</p>
+                  </div>
+                  {step !== "importing" && (
+                    <Button variant="ghost" size="sm" onClick={resetGeneric}>Cambiar</Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {step !== "upload" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <StepBadge n={2} active={step === "mapping"} />
+                  Mapeo de campos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {step === "mapping" ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-slate-500">
+                      Relaciona las columnas de tu CSV con los campos de producto.
+                    </p>
+                    <div className="space-y-3">
+                      {PRODUCT_FIELDS.map((field) => {
+                        const currentValue = mapping[field.key] ?? "";
+                        return (
+                          <div key={field.key} className="grid grid-cols-[1fr,auto,1fr] gap-3 items-center">
+                            <div>
+                              <p className="text-sm font-medium text-slate-700">
+                                {field.label} {field.required && <span className="text-red-500">*</span>}
+                              </p>
+                              <p className="text-xs text-slate-400">{field.description}</p>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-slate-300 shrink-0" />
+                            <select
+                              value={currentValue}
+                              onChange={(e) => updateMapping(field.key, e.target.value)}
+                              className={cn(
+                                "w-full rounded-md border px-3 py-2 text-sm bg-white",
+                                field.required && !currentValue
+                                  ? "border-red-300 focus:ring-red-500"
+                                  : "border-slate-200 focus:ring-blue-500",
+                              )}
+                            >
+                              <option value="">— No mapear —</option>
+                              {csvHeaders.map((h) => (
+                                <option key={h} value={h}>{h}</option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-end pt-2">
+                      <Button onClick={() => setStep("preview")} disabled={!mappingValid}>
+                        Continuar <ArrowRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    {Object.keys(mapping).length} campos mapeados
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {(step === "preview" || step === "importing" || step === "done") && groupResult && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <StepBadge n={3} active={step === "preview"} />
+                  Vista previa e importación
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                    <Package className="h-5 w-5 text-blue-600 mx-auto mb-1" />
+                    <p className="text-xl font-bold text-blue-700">{groupResult.stats.uniqueProducts}</p>
+                    <p className="text-xs text-blue-600">Productos</p>
+                  </div>
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-center">
+                    <Layers className="h-5 w-5 text-purple-600 mx-auto mb-1" />
+                    <p className="text-xl font-bold text-purple-700">{groupResult.stats.totalVariants}</p>
+                    <p className="text-xs text-purple-600">Variaciones</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+                    <p className="text-xl font-bold text-slate-700">{groupResult.stats.productsWithVariants}</p>
+                    <p className="text-xs text-slate-500">Con variaciones</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+                    <p className="text-xl font-bold text-slate-700">{groupResult.stats.totalRows}</p>
+                    <p className="text-xs text-slate-500">Filas CSV</p>
+                  </div>
+                </div>
+
+                {step === "preview" && (
+                  <>
+                    <div className="pt-3 space-y-3 border-t border-slate-200">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPreflightRun(true)}
+                      >
+                        Ejecutar validación
+                      </Button>
+
+                      {preflightRun && preflightReport && (
+                        <div className="space-y-2 text-sm">
+                          <div className={cn(
+                            "rounded-lg border p-3",
+                            preflightReport.critical.length === 0
+                              ? "border-green-200 bg-green-50"
+                              : "border-red-200 bg-red-50",
+                          )}>
+                            <p className="font-medium">
+                              {preflightReport.critical.length === 0
+                                ? "Validación crítica aprobada"
+                                : "Se encontraron bloqueos críticos"}
+                            </p>
+                          </div>
+
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={preflightAccepted}
+                              onChange={(e) => setPreflightAccepted(e.target.checked)}
+                              className="rounded border-slate-300"
+                              disabled={preflightReport.critical.length > 0}
+                            />
+                            <span className="text-xs text-slate-700">
+                              Confirmo que revisé la validación y autorizo iniciar la importación.
+                            </span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <Button variant="outline" onClick={() => setStep("mapping")}>
+                        <ArrowLeft className="h-4 w-4 mr-1" /> Volver al mapeo
+                      </Button>
+                      <Button onClick={startImport} className="flex-1" disabled={!canStartImport}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Importar {groupResult.stats.uniqueProducts} productos
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {step === "importing" && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+                      <span>Procesando… {progress}%</span>
+                    </div>
+                    <Progress value={progress} className="h-3" />
+                  </div>
+                )}
+
+                {step === "done" && result && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                        <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto mb-1" />
+                        <p className="text-2xl font-bold text-green-700">{result.created}</p>
+                        <p className="text-xs text-green-600">Creados</p>
+                      </div>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                        <RefreshCw className="h-5 w-5 text-blue-600 mx-auto mb-1" />
+                        <p className="text-2xl font-bold text-blue-700">{result.updated}</p>
+                        <p className="text-xs text-blue-600">Actualizados</p>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-slate-700">{result.skipped}</p>
+                        <p className="text-xs text-slate-500">Omitidos</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" onClick={resetGeneric} className="w-full">
+                      Importar otro archivo
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   );
